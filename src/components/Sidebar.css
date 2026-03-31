@@ -1,110 +1,111 @@
-.app-container {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.main-content {
-  flex: 1;
-  padding: 2rem 3rem;
-  overflow-y: auto;
-  background-color: var(--bg-color);
-}
-
-.sidebar {
-  width: 280px;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border-color);
+/* Barre de Navigation Mobile Flottante */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6rem;
   background-color: var(--surface-color);
-  z-index: 10;
-}
-
-.sidebar-header {
-  padding: 2rem 1.5rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-glass);
   display: flex;
+  justify-content: space-around;
   align-items: center;
-  gap: 1rem;
+  padding: 0 0.5rem 1rem 0.5rem; /* Espace pour la barre de l'iPhone bas */
+  z-index: 1000;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.05);
 }
 
-.logo-icon {
-  background: var(--primary);
-  color: white;
-  padding: 0.5rem;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+.dark-theme .bottom-nav {
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
 }
 
-.sidebar-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: 0 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+@media (min-width: 601px) {
+  .bottom-nav {
+    /* Sur desktop, la barre reste en bas centrée sous le contenu vertical */
+    max-width: 600px;
+    margin: 0 auto;
+    border-radius: 24px 24px 0 0;
+    border: 1px solid var(--border-glass);
+    border-bottom: none;
+    box-shadow: 0 -20px 40px rgba(0,0,0,0.08);
+  }
 }
 
 .nav-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
+  justify-content: center;
+  gap: 0.35rem;
+  flex: 1;
+  text-decoration: none;
   color: var(--text-secondary);
-  font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0.5rem 0;
 }
 
-.nav-item:hover {
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-}
-
-.nav-item.active {
-  background-color: var(--primary-light);
-  color: var(--primary);
-}
-
-.nav-item.active svg {
-  color: var(--primary);
-}
-
-.sidebar-footer {
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary) 0%, #818cf8 100%);
-  color: white;
+.icon-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 1.2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  z-index: 2;
 }
 
-.user-info span {
-  font-weight: 500;
+.nav-icon {
+  transition: all 0.3s ease;
+}
+
+.nav-item span {
+  font-size: 0.65rem;
+  font-weight: 600;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+/* Animations Actives */
+.nav-item.active {
+  color: var(--primary);
+}
+
+.nav-item.active .icon-wrapper {
+  background: var(--primary-gradient);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.dark-theme .nav-item.active .icon-wrapper {
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
+}
+
+.nav-item.active .nav-icon {
+  color: white;
+  transform: scale(0.9);
+}
+
+.nav-item.active span {
+  opacity: 1;
+  transform: translateY(2px);
   color: var(--text-primary);
+  font-weight: 700;
+}
+
+/* Container de l'application principal */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  /* La nav mobile gère déjà le padding bas via .page-container externe, donc pas besoin de marges énormes ici,
+     mais on garde l'overflow standard géré par window/body. */
+  width: 100%;
 }

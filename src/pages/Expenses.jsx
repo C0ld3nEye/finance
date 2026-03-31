@@ -1,52 +1,65 @@
 import React, { useState, useEffect } from 'react';
-import { getExpensesByMonth, addExpense, deleteExpense } from '../services/expenses';
-import { getSettings } from '../services/settings';
-import { auth } from '../config/firebase';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Calendar, Tag } from 'lucide-react';
+import { getExpensesByMonth, addExpense, deleteExpense, updateExpense } from '../services/expenses';
 import { format, addMonths, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getSettings } from '../services/settings';
+import { auth } from '../config/firebase';
+import { 
+  Plus, Trash2, ChevronLeft, ChevronRight, Calendar, Tag, Users, Lock, Edit2, X,
+  ShoppingBag, Home, Car, Gamepad2, HeartPulse, Smartphone, Tv, Gift, Dumbbell, Dog, ShieldCheck, Landmark, MoreHorizontal
+} from 'lucide-react';
 
-const Expenses = () => {
+import { CATEGORY_CONFIG, CATEGORIES, getCategoryConfig } from '../constants/categories';
+
+const Expenses = ({ householdId }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   
   const [showAddForm, setShowAddForm] = useState(false);
+  const [viewingExpense, setViewingExpense] = useState(null);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [newExpense, setNewExpense] = useState({
     description: '',
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     category: 'Alimentation',
-    paidBy: '', // member id
-    accountId: '' // bank account id
+    paidBy: '',
+    accountId: '',
+    visibility: 'shared',
+    distributionType: '50_50',
+    customPercentages: {}
   });
 
-  const categories = ['Alimentation', 'Logement', 'Transport', 'Loisirs', 'Santé', 'Autre'];
+  const categories = Object.keys(CATEGORY_CONFIG);
 
   useEffect(() => {
     fetchData(currentDate);
-  }, [currentDate]);
+  }, [currentDate, householdId]);
 
   const fetchData = async (date) => {
     const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    if (!uid || !householdId) return;
     setLoading(true);
     try {
       const year = date.getFullYear();
       const month = date.getMonth();
       const [expensesData, settingsData] = await Promise.all([
-        getExpensesByMonth(uid, year, month),
-        getSettings(uid)
+        getExpensesByMonth(householdId, uid, year, month),
+        getSettings(householdId)
       ]);
       setExpenses(expensesData);
       setSettings(settingsData);
       
       // Auto-select first member and first account if not set
+      // Only show shared accounts + mine
+      const availableAccounts = settingsData?.accounts.filter(a => a.visibility === 'shared' || a.ownerId === uid) || [];
+      
       setNewExpense(prev => ({ 
         ...prev, 
         paidBy: prev.paidBy || (settingsData?.members?.[0]?.id || ''),
-        accountId: prev.accountId || (settingsData?.accounts?.[0]?.id || '')
+        accountId: prev.accountId || (availableAccounts[0]?.id || '')
       }));
     } catch (error) {
       console.error("Error loading expenses", error);
@@ -58,23 +71,66 @@ const Expenses = () => {
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
 
+  const calculateDistribution = (amount, type, customDist) => {
+    const numAmount = Number(amount);
+    if (type === '50_50') {
+      const half = numAmount / 2;
+      const res = {};
+      settings.members.forEach(m => res[m.id] = half);
+      return res;
+    }
+    if (type === 'prorata') {
+      // Pour les dépenses ponctuelles, on peut utiliser le prorata du mois en cours
+      // (Simplified logic here, logic in Debts handles historical prorata)
+      const res = {};
+      const totalSal = settings.members.reduce((acc, m) => acc + (m.salary || 0), 0);
+      settings.members.forEach(m => res[m.id] = totalSal > 0 ? (numAmount * (m.salary || 0)) / totalSal : numAmount / 2);
+      return res;
+    }
+    if (type === 'custom') {
+      const res = {};
+      settings.members.forEach(m => res[m.id] = (numAmount * (customDist[m.id] || 0)) / 100);
+      return res;
+    }
+    return {};
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     const uid = auth.currentUser?.uid;
-    if (!uid || !newExpense.description || !newExpense.amount || !newExpense.accountId) return;
+    if (!uid || !householdId || !newExpense.description || !newExpense.amount || !newExpense.accountId) return;
     
-    // Convert local date string to ISO string for Firebase
+    const selectedAccount = settings?.accounts?.find(a => a.id === newExpense.accountId);
+    let finalExpense = { ...newExpense };
+
+    // On utilise TOUJOURS la répartition choisie par l'utilisateur
+    finalExpense.distribution = calculateDistribution(newExpense.amount, newExpense.distributionType, newExpense.customPercentages);
+    
+    
     const expenseDate = new Date(newExpense.date);
     expenseDate.setMinutes(expenseDate.getMinutes() + expenseDate.getTimezoneOffset());
     
+    const myShare = finalExpense.distribution?.[uid] || 0;
+    const isFullyMe = Math.abs(myShare - Number(newExpense.amount)) < 0.01;
+    const hasOtherShare = Object.entries(finalExpense.distribution).some(([mId, amount]) => mId !== uid && amount > 0.01);
+    
+    let visibility = newExpense.visibility;
+    if (hasOtherShare) {
+      visibility = 'shared';
+    } else if (isFullyMe) {
+      visibility = uid;
+    }
+
     const expenseToSave = {
-      ...newExpense,
+      ...finalExpense,
       amount: Number(newExpense.amount),
-      date: expenseDate.toISOString()
+      date: expenseDate.toISOString(),
+      visibility: visibility
     };
     
+    
     try {
-      const saved = await addExpense(uid, expenseToSave);
+      const saved = await addExpense(householdId, uid, expenseToSave);
       const savedDate = new Date(saved.date);
       if (savedDate.getMonth() === currentDate.getMonth() && savedDate.getFullYear() === currentDate.getFullYear()) {
          setExpenses([saved, ...expenses].sort((a,b) => new Date(b.date) - new Date(a.date)));
@@ -88,20 +144,74 @@ const Expenses = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm("Supprimer cette dépense ?")) {
-      await deleteExpense(id);
+      await deleteExpense(householdId, id);
       setExpenses(expenses.filter(e => e.id !== id));
     }
   };
 
+  const handleViewClick = (expense) => {
+    setViewingExpense(prev => (prev?.id === expense.id ? null : expense));
+  };
+
+  const handleEditFromView = () => {
+    const expense = viewingExpense;
+    setEditingExpense({
+      ...expense,
+      date: format(new Date(expense.date), 'yyyy-MM-dd')
+    });
+    setViewingExpense(null);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    const uid = auth.currentUser?.uid;
+    if (!uid || !householdId || !editingExpense.id) return;
+
+    let finalUpdates = { ...editingExpense };
+
+    // Pas de forçage automatique de la visibilité sur l'ID utilisateur
+    // L'utilisateur garde le contrôle total.
+    // On s'assure juste que le compte par défaut est bien lié.
+    finalUpdates.distribution = calculateDistribution(editingExpense.amount, editingExpense.distributionType, editingExpense.customPercentages);
+    
+    const expenseDate = new Date(editingExpense.date);
+    expenseDate.setMinutes(expenseDate.getMinutes() + expenseDate.getTimezoneOffset());
+
+    const myShare = finalUpdates.distribution?.[uid] || 0;
+    const isFullyMe = Math.abs(myShare - Number(editingExpense.amount)) < 0.01;
+    const hasOtherShare = Object.entries(finalUpdates.distribution).some(([mId, amount]) => mId !== uid && amount > 0.01);
+    
+    let visibility = editingExpense.visibility;
+    if (hasOtherShare) {
+      visibility = 'shared';
+    } else if (isFullyMe) {
+      visibility = uid;
+    }
+
+    const updates = {
+      ...finalUpdates,
+      amount: Number(editingExpense.amount),
+      date: expenseDate.toISOString(),
+      visibility: visibility
+    };
+    delete updates.id;
+
+    try {
+      await updateExpense(householdId, editingExpense.id, updates);
+      setExpenses(expenses.map(exp => exp.id === editingExpense.id ? { ...editingExpense, ...updates } : exp));
+      setEditingExpense(null);
+    } catch (error) {
+      console.error("Error updating expense", error);
+    }
+  };
+
   const getMemberName = (id) => {
-    if (!settings) return '';
-    const mem = settings.members.find(m => m.id === id);
+    const mem = settings?.members?.find(m => m.id === id);
     return mem ? mem.name : 'Inconnu';
   };
 
   const getAccountName = (id) => {
-    if (!settings) return '';
-    const acc = settings.accounts.find(a => a.id === id);
+    const acc = settings?.accounts?.find(a => a.id === id);
     return acc ? acc.name : 'Inconnu';
   };
 
@@ -167,11 +277,55 @@ const Expenses = () => {
             <div>
               <label className="label">Compte de prélèvement</label>
               <select className="input-field" value={newExpense.accountId} onChange={e => setNewExpense({...newExpense, accountId: e.target.value})}>
-                {settings?.accounts?.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                {settings?.accounts?.filter(a => a.visibility === 'shared' || a.ownerId === auth.currentUser?.uid).map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({acc.visibility === 'shared' ? 'Commun' : 'Perso'})</option>
                 ))}
               </select>
             </div>
+            <div>
+              <label className="label">Répartition</label>
+              <select className="input-field" value={newExpense.distributionType} onChange={e => setNewExpense({...newExpense, distributionType: e.target.value})}>
+                <option value="50_50">50/50</option>
+                <option value="prorata">Prorata</option>
+                <option value="custom">Perso (%)</option>
+              </select>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                <button type="button" className="btn-small" style={{ flex: 1, backgroundColor: '#f3e8ff', color: '#a855f7', border: '1px solid #f3e8ff' }} onClick={() => {
+                  const me = settings.members.find(m => m.id === auth.currentUser.uid);
+                  if (!me) { alert("⚠ Identifiez-vous d'abord dans les Paramètres (cliquez sur 'C'est moi')."); return; }
+                  const dist = {};
+                  settings.members.forEach(m => dist[m.id] = (m.id === me.id ? 100 : 0));
+                  setNewExpense({...newExpense, distributionType: 'custom', customPercentages: dist});
+                }}>Moi</button>
+                <button type="button" className="btn-small" style={{ flex: 1 }} onClick={() => {
+                  const partner = settings.members.find(m => m.id !== auth.currentUser.uid);
+                  if (partner && partner.id.length > 5) { // Only if partner is also linked?
+                    const dist = {};
+                    settings.members.forEach(m => dist[m.id] = (m.id === partner.id ? 100 : 0));
+                    setNewExpense({...newExpense, distributionType: 'custom', customPercentages: dist});
+                  } else {
+                    const me = settings.members.find(m => m.id === auth.currentUser.uid);
+                    const notMe = settings.members.find(m => m.id !== me?.id);
+                    if (notMe) {
+                      const dist = {};
+                      settings.members.forEach(m => dist[m.id] = (m.id === notMe.id ? 100 : 0));
+                      setNewExpense({...newExpense, distributionType: 'custom', customPercentages: dist});
+                    }
+                  }
+                }}>L'autre</button>
+              </div>
+            </div>
+
+            {newExpense.distributionType === 'custom' && (
+              <div style={{ gridColumn: '1 / -1', backgroundColor: 'var(--bg-color)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', gap: '1rem' }}>
+                 {settings.members.map(m => (
+                   <div key={m.id} style={{ flex: 1 }}>
+                     <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.name} (%)</label>
+                     <input type="number" className="input-field" value={newExpense.customPercentages[m.id] ?? ''} onChange={e => setNewExpense({...newExpense, customPercentages: {...newExpense.customPercentages, [m.id]: Number(e.target.value)}})} />
+                   </div>
+                 ))}
+              </div>
+            )}
             
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button type="button" className="btn btn-outline" onClick={() => setShowAddForm(false)}>Annuler</button>
@@ -184,42 +338,219 @@ const Expenses = () => {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>Chargement...</div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>Dépenses de {format(currentDate, 'MMMM', { locale: fr })}</h3>
-            <span style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>Total : {totalMonth.toFixed(2)} €</span>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {expenses.map((expense) => (
-              <div key={expense.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s ease' }} onMouseOver={e => e.currentTarget.style.backgroundColor='var(--primary-light)'} onMouseOut={e => e.currentTarget.style.backgroundColor='var(--surface-color)'}>
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          {expenses.map((expense) => (
+            <div key={expense.id} style={{ marginBottom: '0.5rem' }}>
+              <div 
+                className="card" 
+                style={{ 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '1.25rem 1.5rem', 
+                  borderBottom: viewingExpense?.id === expense.id ? 'none' : '1px solid var(--border-color)',
+                  borderBottomLeftRadius: viewingExpense?.id === expense.id ? '0' : 'var(--radius-md)',
+                  borderBottomRightRadius: viewingExpense?.id === expense.id ? '0' : 'var(--radius-md)',
+                  transition: 'background-color 0.2s ease',
+                  boxShadow: viewingExpense?.id === expense.id ? 'none' : 'var(--shadow-sm)'
+                }} 
+                onMouseOver={e => e.currentTarget.style.backgroundColor='var(--primary-light)'} 
+                onMouseOut={e => e.currentTarget.style.backgroundColor='var(--surface-color)'}
+                onClick={() => handleViewClick(expense)}
+              >
                 <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '50px' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{format(new Date(expense.date), 'MMM', { locale: fr })}</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>{format(new Date(expense.date), 'dd')}</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)' }}>{format(new Date(expense.date), 'dd')}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{format(new Date(expense.date), 'MMM', { locale: fr })}</span>
                   </div>
-                  <div>
-                    <h4 style={{ fontWeight: '600', marginBottom: '0.25rem', fontSize: '1.05rem' }}>{expense.description}</h4>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Tag size={12} /> {expense.category}</span>
-                      <span>• Par : {getMemberName(expense.paidBy)}</span>
-                      <span>• Compte : <span style={{color: 'var(--text-primary)', fontWeight: '500'}}>{getAccountName(expense.accountId)}</span></span>
+                  <div style={{ borderLeft: '1px solid var(--border-color)', height: '40px' }}></div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: '600', fontSize: '1.1rem', color: 'var(--text-primary)' }}>{expense.description}</span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ 
+                        padding: '0.2rem 0.6rem', 
+                        borderRadius: '10px', 
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        backgroundColor: getCategoryConfig(expense.category).bg,
+                        color: getCategoryConfig(expense.category).color
+                      }}>
+                        {React.createElement(getCategoryConfig(expense.category).icon, { size: 12 })} {expense.category || 'Autre'}
+                      </span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>• {getMemberName(expense.paidBy)}</span>
+                      <span style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.3rem',
+                        color: expense.visibility === 'shared' ? 'var(--primary)' : 'var(--text-secondary)',
+                        fontSize: '0.8rem'
+                      }}>
+                        {expense.visibility === 'shared' ? <Users size={12} /> : <Lock size={12} />}
+                        {expense.visibility === 'shared' ? 'Foyer' : 'Perso'}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>{expense.amount.toFixed(2)} €</span>
-                  <button onClick={() => handleDelete(expense.id)} style={{ color: 'var(--text-secondary)', padding: '0.5rem', backgroundColor: 'transparent', cursor: 'pointer', border: 'none' }} onMouseOver={e => e.currentTarget.style.color='var(--danger)'} onMouseOut={e => e.currentTarget.style.color='var(--text-secondary)'}>
-                    <Trash2 size={18} />
-                  </button>
+                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)' }}>{expense.amount.toFixed(2)} €</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {expense.distributionType === 'prorata' ? 'Prorata' : expense.distributionType === '50_50' ? '50/50' : 'Perso'}
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
-            {expenses.length === 0 && (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                Aucune dépense enregistrée pour ce mois.
+
+              {/* Détails Inline (Accordéon) */}
+              {viewingExpense?.id === expense.id && (
+                <div className="animate-slide-down" style={{ 
+                  backgroundColor: 'var(--surface-color)', 
+                  border: '1px solid var(--border-color)', 
+                  borderTop: 'none',
+                  borderBottomLeftRadius: 'var(--radius-md)',
+                  borderBottomRightRadius: 'var(--radius-md)',
+                  padding: '1.5rem',
+                  marginTop: '-1px',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                    <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Compte : <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{getAccountName(expense.accountId)}</span></p>
+                      <p style={{ fontWeight: '600', marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--primary)' }}>Répartition des parts :</p>
+                      {Object.entries(expense.distribution || {}).map(([mId, amount]) => (
+                        <div key={mId} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                          <span>{getMemberName(mId)}</span>
+                          <span style={{ fontWeight: '600' }}>{amount.toFixed(2)} €</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                        onClick={(e) => { e.stopPropagation(); handleEditFromView(); }}
+                      >
+                        <Edit2 size={18} /> Modifier
+                      </button>
+                      <button 
+                        className="btn" 
+                        style={{ width: '100%', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); setViewingExpense(null); }}
+                      >
+                        <Trash2 size={18} /> Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {expenses.length === 0 && (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Aucune dépense enregistrée pour ce mois.
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* Modal d'édition */}
+      {editingExpense && (
+        <div className="modal-overlay" onClick={() => setEditingExpense(null)}>
+          <div className="modal-content card" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Modifier la Dépense</h2>
+              <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => setEditingExpense(null)}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdate} style={{ display: 'grid', gap: '1.5rem' }}>
+              <div>
+                <label className="label">Description</label>
+                <input type="text" className="input-field" required value={editingExpense.description} onChange={e => setEditingExpense({...editingExpense, description: e.target.value})} />
               </div>
-            )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="label">Montant (€)</label>
+                  <input type="number" className="input-field" step="0.01" required value={editingExpense.amount} onChange={e => setEditingExpense({...editingExpense, amount: e.target.value})} />
+                </div>
+                <div>
+                  <label className="label">Date</label>
+                  <input type="date" className="input-field" required value={editingExpense.date} onChange={e => setEditingExpense({...editingExpense, date: e.target.value})} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="label">Catégorie</label>
+                  <select className="input-field" value={editingExpense.category} onChange={e => setEditingExpense({...editingExpense, category: e.target.value})}>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Payé par</label>
+                  <select className="input-field" value={editingExpense.paidBy} onChange={e => setEditingExpense({...editingExpense, paidBy: e.target.value})}>
+                    {settings?.members?.map(mem => (
+                      <option key={mem.id} value={mem.id}>{mem.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label className="label">Compte</label>
+                  <select className="input-field" value={editingExpense.accountId} onChange={e => setEditingExpense({...editingExpense, accountId: e.target.value})}>
+                    {settings?.accounts?.filter(a => a.visibility === 'shared' || a.ownerId === auth.currentUser?.uid).map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.name} ({acc.visibility === 'shared' ? 'Commun' : 'Perso'})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Répartition</label>
+                  <select className="input-field" value={editingExpense.distributionType} onChange={e => setEditingExpense({...editingExpense, distributionType: e.target.value})}>
+                    <option value="50_50">50/50</option>
+                    <option value="prorata">Prorata</option>
+                    <option value="custom">Perso (%)</option>
+                  </select>
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                    <button type="button" className="btn-small" style={{ flex: 1, backgroundColor: '#f3e8ff', color: '#a855f7', border: '1px solid #f3e8ff' }} onClick={() => {
+                      const dist = {};
+                      settings.members.forEach(m => dist[m.id] = (m.id === auth.currentUser.uid ? 100 : 0));
+                      setEditingExpense({...editingExpense, distributionType: 'custom', customPercentages: dist});
+                    }}>Moi</button>
+                    <button type="button" className="btn-small" style={{ flex: 1 }} onClick={() => {
+                      const partner = settings.members.find(m => m.id !== auth.currentUser.uid);
+                      if (partner) {
+                        const dist = {};
+                        settings.members.forEach(m => dist[m.id] = (m.id === partner.id ? 100 : 0));
+                        setEditingExpense({...editingExpense, distributionType: 'custom', customPercentages: dist});
+                      }
+                    }}>L'autre</button>
+                  </div>
+                </div>
+              </div>
+
+              {editingExpense.distributionType === 'custom' && (
+                <div style={{ backgroundColor: 'var(--bg-color)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', gap: '1rem' }}>
+                   {settings.members.map(m => (
+                     <div key={m.id} style={{ flex: 1 }}>
+                       <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.name} (%)</label>
+                       <input type="number" className="input-field" value={editingExpense.customPercentages?.[m.id] || 0} onChange={e => setEditingExpense({...editingExpense, customPercentages: {...(editingExpense.customPercentages || {}), [m.id]: Number(e.target.value)}})} />
+                     </div>
+                   ))}
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setEditingExpense(null)}>Annuler</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Sauvegarder les modifications</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

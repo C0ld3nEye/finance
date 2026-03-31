@@ -1,52 +1,53 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Wallet, Settings } from 'lucide-react';
-import { auth } from '../config/firebase';
+import { LayoutDashboard, Receipt, Wallet, Settings, TrendingUp, ArrowRightLeft } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = () => {
   return (
-    <aside className="sidebar glass">
-      <div className="sidebar-header">
-        <div className="logo-icon">
-          <Wallet className="icon-main" size={24} />
+    <nav className="bottom-nav">
+      <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <LayoutDashboard size={22} className="nav-icon" />
         </div>
-        <h2>Family Finance</h2>
-      </div>
+        <span>Accueil</span>
+      </NavLink>
       
-      <nav className="sidebar-nav">
-        <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <LayoutDashboard size={20} />
-          <span>Dashboard</span>
-        </NavLink>
-        <NavLink to="/expenses" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Receipt size={20} />
-          <span>Dépenses</span>
-        </NavLink>
-        <NavLink to="/charges" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Wallet size={20} />
-          <span>Charges Fixes</span>
-        </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Settings size={20} />
-          <span>Paramètres</span>
-        </NavLink>
-      </nav>
-      
-      <div className="sidebar-footer">
-        <div className="user-info" style={{ marginBottom: '1rem' }}>
-          <div className="avatar">F</div>
-          <span>Foyer</span>
+      <NavLink to="/salaries" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <TrendingUp size={22} className="nav-icon" />
         </div>
-        <button 
-          onClick={() => auth.signOut()} 
-          className="btn btn-outline" 
-          style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', justifyContent: 'center' }}
-        >
-          Déconnexion
-        </button>
-      </div>
-    </aside>
+        <span>Revenus</span>
+      </NavLink>
+      
+      <NavLink to="/expenses" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <Receipt size={22} className="nav-icon" />
+        </div>
+        <span>Dépenses</span>
+      </NavLink>
+      
+      <NavLink to="/charges" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <Wallet size={22} className="nav-icon" />
+        </div>
+        <span>Charges</span>
+      </NavLink>
+      
+      <NavLink to="/debts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <ArrowRightLeft size={22} className="nav-icon" />
+        </div>
+        <span>Dettes</span>
+      </NavLink>
+      
+      <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <div className="icon-wrapper">
+          <Settings size={22} className="nav-icon" />
+        </div>
+        <span>Profil</span>
+      </NavLink>
+    </nav>
   );
 };
 

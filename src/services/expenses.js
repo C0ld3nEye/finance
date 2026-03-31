@@ -3,13 +3,14 @@ import { db } from '../config/firebase';
 
 const collectionName = 'expenses';
 
-export const getExpensesByMonth = async (year, month) => {
-  // month is 0-indexed (0 = Jan, 11 = Dec)
+export const getExpensesByMonth = async (uid, year, month) => {
+  if (!uid) return [];
   const startDate = new Date(year, month, 1);
   const endDate = new Date(year, month + 1, 0, 23, 59, 59);
   
   const q = query(
     collection(db, collectionName),
+    where('userId', '==', uid),
     where('date', '>=', startDate.toISOString()),
     where('date', '<=', endDate.toISOString()),
     orderBy('date', 'desc')
@@ -19,9 +20,10 @@ export const getExpensesByMonth = async (year, month) => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
-export const addExpense = async (expense) => {
-  const docRef = await addDoc(collection(db, collectionName), expense);
-  return { id: docRef.id, ...expense };
+export const addExpense = async (uid, expense) => {
+  const expenseWithUser = { ...expense, userId: uid };
+  const docRef = await addDoc(collection(db, collectionName), expenseWithUser);
+  return { id: docRef.id, ...expenseWithUser };
 };
 
 export const updateExpense = async (id, updates) => {

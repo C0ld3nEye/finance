@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getExpensesByMonth, addExpense, deleteExpense } from '../services/expenses';
 import { getSettings } from '../services/settings';
+import { auth } from '../config/firebase';
 import { Plus, Trash2, ChevronLeft, ChevronRight, Calendar, Tag } from 'lucide-react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -17,7 +18,8 @@ const Expenses = () => {
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     category: 'Alimentation',
-    paidBy: '' // member id
+    paidBy: '', // member id
+    accountId: '' // bank account id
   });
 
   const categories = ['Alimentation', 'Logement', 'Transport', 'Loisirs', 'Santé', 'Autre'];
@@ -27,19 +29,25 @@ const Expenses = () => {
   }, [currentDate]);
 
   const fetchData = async (date) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     setLoading(true);
     try {
       const year = date.getFullYear();
       const month = date.getMonth();
       const [expensesData, settingsData] = await Promise.all([
-        getExpensesByMonth(year, month),
-        getSettings()
+        getExpensesByMonth(uid, year, month),
+        getSettings(uid)
       ]);
       setExpenses(expensesData);
       setSettings(settingsData);
-      if (settingsData && settingsData.members.length > 0 && !newExpense.paidBy) {
-        setNewExpense(prev => ({ ...prev, paidBy: settingsData.members[0].id }));
-      }
+      
+      // Auto-select first member and first account if not set
+      setNewExpense(prev => ({ 
+        ...prev, 
+        paidBy: prev.paidBy || (settingsData?.members?.[0]?.id || ''),
+        accountId: prev.accountId || (settingsData?.accounts?.[0]?.id || '')
+      }));
     } catch (error) {
       console.error("Error loading expenses", error);
     } finally {
@@ -52,11 +60,11 @@ const Expenses = () => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newExpense.description || !newExpense.amount) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid || !newExpense.description || !newExpense.amount || !newExpense.accountId) return;
     
     // Convert local date string to ISO string for Firebase
     const expenseDate = new Date(newExpense.date);
-    // Adjust for local timezone to ensure it stores the correct day
     expenseDate.setMinutes(expenseDate.getMinutes() + expenseDate.getTimezoneOffset());
     
     const expenseToSave = {
@@ -66,14 +74,13 @@ const Expenses = () => {
     };
     
     try {
-      const saved = await addExpense(expenseToSave);
-      // Check if it belongs to current displayed month
+      const saved = await addExpense(uid, expenseToSave);
       const savedDate = new Date(saved.date);
       if (savedDate.getMonth() === currentDate.getMonth() && savedDate.getFullYear() === currentDate.getFullYear()) {
          setExpenses([saved, ...expenses].sort((a,b) => new Date(b.date) - new Date(a.date)));
       }
       setShowAddForm(false);
-      setNewExpense({ ...newExpense, description: '', amount: '' }); // keep category, date, paidBy
+      setNewExpense({ ...newExpense, description: '', amount: '' });
     } catch (error) {
       console.error("Error adding expense", error);
     }
@@ -90,6 +97,12 @@ const Expenses = () => {
     if (!settings) return '';
     const mem = settings.members.find(m => m.id === id);
     return mem ? mem.name : 'Inconnu';
+  };
+
+  const getAccountName = (id) => {
+    if (!settings) return '';
+    const acc = settings.accounts.find(a => a.id === id);
+    return acc ? acc.name : 'Inconnu';
   };
 
   const totalMonth = expenses.reduce((acc, exp) => acc + exp.amount, 0);
@@ -123,7 +136,7 @@ const Expenses = () => {
         <div className="card animate-fade-in" style={{ marginBottom: '2rem', border: '1px solid var(--primary-light)' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', fontWeight: '600' }}>Ajouter une Dépense</h2>
           <form onSubmit={handleAdd} style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-            <div>
+            <div style={{ gridColumn: 'span 2' }}>
               <label className="label">Description / Libellé</label>
               <input type="text" className="input-field" required value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} placeholder="ex: Courses Leclerc" />
             </div>
@@ -143,11 +156,19 @@ const Expenses = () => {
                 ))}
               </select>
             </div>
-            <div style={{ gridColumn: 'span 1' }}>
+            <div>
               <label className="label">Payé par</label>
               <select className="input-field" value={newExpense.paidBy} onChange={e => setNewExpense({...newExpense, paidBy: e.target.value})}>
                 {settings?.members?.map(mem => (
                   <option key={mem.id} value={mem.id}>{mem.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Compte de prélèvement</label>
+              <select className="input-field" value={newExpense.accountId} onChange={e => setNewExpense({...newExpense, accountId: e.target.value})}>
+                {settings?.accounts?.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
             </div>
@@ -179,9 +200,10 @@ const Expenses = () => {
                   </div>
                   <div>
                     <h4 style={{ fontWeight: '600', marginBottom: '0.25rem', fontSize: '1.05rem' }}>{expense.description}</h4>
-                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Tag size={12} /> {expense.category}</span>
                       <span>• Par : {getMemberName(expense.paidBy)}</span>
+                      <span>• Compte : <span style={{color: 'var(--text-primary)', fontWeight: '500'}}>{getAccountName(expense.accountId)}</span></span>
                     </div>
                   </div>
                 </div>

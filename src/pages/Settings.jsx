@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '../services/settings';
+import { auth } from '../config/firebase';
 import { Save, Plus, Trash2 } from 'lucide-react';
 
 const Settings = () => {
@@ -12,8 +13,10 @@ const Settings = () => {
   }, []);
 
   const loadSettings = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     try {
-      const data = await getSettings();
+      const data = await getSettings(uid);
       setSettings(data);
     } catch (error) {
       console.error("Failed to load settings", error);
@@ -23,9 +26,11 @@ const Settings = () => {
   };
 
   const handleSave = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     setSaving(true);
     try {
-      await updateSettings(settings);
+      await updateSettings(uid, settings);
       alert('Paramètres sauvegardés avec succès !');
     } catch (error) {
       console.error("Failed to save", error);

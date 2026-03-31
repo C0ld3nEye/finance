@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getExpensesByMonth } from '../services/expenses';
 import { getCharges } from '../services/charges';
 import { getSettings } from '../services/settings';
+import { auth } from '../config/firebase';
 import { PieChart, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 
 const Dashboard = () => {
@@ -18,12 +19,15 @@ const Dashboard = () => {
   }, []);
 
   const fetchData = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    
     try {
       const now = new Date();
       const [expenses, charges, settings] = await Promise.all([
-        getExpensesByMonth(now.getFullYear(), now.getMonth()),
-        getCharges(),
-        getSettings()
+        getExpensesByMonth(uid, now.getFullYear(), now.getMonth()),
+        getCharges(uid),
+        getSettings(uid)
       ]);
 
       const tExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);

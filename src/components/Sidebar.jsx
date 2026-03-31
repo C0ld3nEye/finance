@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Receipt, Wallet, Settings } from 'lucide-react';
+import { auth } from '../config/firebase';
 import './Sidebar.css';
 
 const Sidebar = () => {
@@ -33,10 +34,17 @@ const Sidebar = () => {
       </nav>
       
       <div className="sidebar-footer">
-        <div className="user-info">
+        <div className="user-info" style={{ marginBottom: '1rem' }}>
           <div className="avatar">F</div>
           <span>Foyer</span>
         </div>
+        <button 
+          onClick={() => auth.signOut()} 
+          className="btn btn-outline" 
+          style={{ width: '100%', fontSize: '0.85rem', padding: '0.5rem', justifyContent: 'center' }}
+        >
+          Déconnexion
+        </button>
       </div>
     </aside>
   );

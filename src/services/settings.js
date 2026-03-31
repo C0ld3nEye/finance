@@ -3,8 +3,9 @@ import { db } from '../config/firebase';
 
 const SETTINGS_DOC_ID = 'household_settings';
 
-export const getSettings = async () => {
-  const docRef = doc(db, 'settings', SETTINGS_DOC_ID);
+export const getSettings = async (uid) => {
+  if (!uid) return null;
+  const docRef = doc(db, 'settings', uid);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     return docSnap.data();
@@ -25,7 +26,7 @@ export const getSettings = async () => {
   return defaultSettings;
 };
 
-export const updateSettings = async (newSettings) => {
-  const docRef = doc(db, 'settings', SETTINGS_DOC_ID);
+export const updateSettings = async (uid, newSettings) => {
+  const docRef = doc(db, 'settings', uid);
   await updateDoc(docRef, newSettings);
 };

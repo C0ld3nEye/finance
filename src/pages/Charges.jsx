@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getCharges, addCharge, deleteCharge } from '../services/charges';
 import { getSettings } from '../services/settings';
+import { auth } from '../config/firebase';
 import { Plus, Trash2, PieChart } from 'lucide-react';
 
 const Charges = () => {
@@ -22,10 +23,12 @@ const Charges = () => {
   }, []);
 
   const fetchData = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     try {
       const [chargesData, settingsData] = await Promise.all([
-        getCharges(),
-        getSettings()
+        getCharges(uid),
+        getSettings(uid)
       ]);
       setCharges(chargesData);
       setSettings(settingsData);
@@ -60,7 +63,8 @@ const Charges = () => {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newCharge.name || !newCharge.amount) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid || !newCharge.name || !newCharge.amount) return;
     
     const finalDist = calculateDistribution(newCharge.amount, newCharge.distributionType, newCharge.customDistribution);
     
@@ -71,7 +75,7 @@ const Charges = () => {
     };
     
     try {
-      const saved = await addCharge(chargeToSave);
+      const saved = await addCharge(uid, chargeToSave);
       setCharges([...charges, saved]);
       setShowAddForm(false);
       setNewCharge({ ...newCharge, name: '', amount: '' });

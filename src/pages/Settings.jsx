@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings, updateUserProfile } from '../services/settings';
 import { auth } from '../config/firebase';
 import { Save, Plus, Trash2, Home, Users, Lock } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 
 const Settings = ({ householdId, onHouseholdUpdate }) => {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hIdInput, setHidInput] = useState(householdId || '');
+  const { alert, confirm } = useConfirm();
 
   useEffect(() => {
     if (householdId) {
@@ -35,11 +37,22 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     try {
       const uid = auth.currentUser?.uid;
       await updateUserProfile(uid, { householdId: hIdInput.trim() });
+      await updateUserProfile(uid, { householdId: hIdInput.trim() });
       onHouseholdUpdate(hIdInput.trim());
-      alert('Foyer mis à jour !');
+      await alert({ 
+        title: 'Foyer mis à jour', 
+        message: 'Vous avez rejoint le foyer : ' + hIdInput.trim(),
+        variant: 'success',
+        icon: 'success'
+      });
     } catch (error) {
       console.error(error);
-      alert('Erreur lors de la mise à jour du foyer.');
+      await alert({ 
+        title: 'Erreur', 
+        message: 'Impossible de mettre à jour le foyer.',
+        variant: 'danger',
+        icon: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -50,10 +63,20 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     setSaving(true);
     try {
       await updateSettings(householdId, settings);
-      alert('Paramètres du foyer sauvegardés !');
+      await alert({ 
+        title: 'Sauvegarde effectuée', 
+        message: 'Les paramètres du foyer ont été mis à jour.',
+        variant: 'success',
+        icon: 'save'
+      });
     } catch (error) {
       console.error(error);
-      alert('Erreur lors de la sauvegarde.');
+      await alert({ 
+        title: 'Erreur', 
+        message: 'Erreur lors de la sauvegarde.',
+        variant: 'danger',
+        icon: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -172,7 +195,12 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
                             // Migration Firestore
                             try {
                               await import('../services/migration').then(m => m.migrateMemberId(householdId, oldId, newId));
-                              alert("Lien établi et données migrées !");
+                              await alert({
+                                title: 'Profil lié',
+                                message: 'Votre compte est désormais lié à ce membre du foyer et vos données ont été migrées.',
+                                variant: 'success',
+                                icon: 'success'
+                              });
                             } catch (err) {
                               console.error("Migration error", err);
                             }
@@ -269,15 +297,25 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
                return count;
              };
 
-             try {
-               const expCount = await updateCat('expenses');
-               const charCount = await updateCat('charges');
-               alert(`Réparation terminée ! ${expCount + charCount} éléments ont été catégorisés.`);
-               window.location.reload();
-             } catch (err) {
-               console.error(err);
-               alert("Erreur lors de la réparation.");
-             }
+              try {
+                const expCount = await updateCat('expenses');
+                const charCount = await updateCat('charges');
+                await alert({
+                  title: 'Réparation terminée',
+                  message: `${expCount + charCount} éléments ont été catégorisés automatiquement.`,
+                  variant: 'success',
+                  icon: 'settings'
+                });
+                window.location.reload();
+              } catch (err) {
+                console.error(err);
+                await alert({
+                  title: 'Erreur',
+                  message: 'Une erreur est survenue lors de la réparation.',
+                  variant: 'danger',
+                  icon: 'error'
+                });
+              }
           }}
         >
           🪄 Réparer mes catégories (Nettoyage automatique)

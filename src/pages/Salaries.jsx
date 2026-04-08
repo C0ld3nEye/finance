@@ -3,6 +3,7 @@ import { getSettings } from '../services/settings';
 import { getMonthlySalaries, updateMonthlySalaries } from '../services/salaries';
 import { auth } from '../config/firebase';
 import { Wallet, Check, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 
 const Salaries = ({ householdId }) => {
   const [loading, setLoading] = useState(true);
@@ -10,6 +11,7 @@ const Salaries = ({ householdId }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [salaries, setSalaries] = useState({});
   const [saving, setSaving] = useState(false);
+  const { alert } = useConfirm();
 
   useEffect(() => {
     fetchData();
@@ -47,9 +49,19 @@ const Salaries = ({ householdId }) => {
     const month = currentDate.getMonth();
     try {
       await updateMonthlySalaries(householdId, year, month, salaries);
-      alert('Salaires enregistrés pour ' + currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }));
+      await alert({ 
+        title: 'Sauvegarde réussie', 
+        message: 'Vos revenus ont été enregistrés avec succès pour ' + currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+        variant: 'success',
+        icon: 'save'
+      });
     } catch (error) {
-      alert('Erreur lors de la sauvegarde');
+      await alert({ 
+        title: 'Erreur', 
+        message: 'Une erreur est survenue lors de la sauvegarde.',
+        variant: 'danger',
+        icon: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -111,19 +123,50 @@ const Salaries = ({ householdId }) => {
               />
               <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: '700', color: 'var(--text-secondary)' }}>€</span>
             </div>
+
+            {Object.values(salaries).reduce((a, b) => a + b, 0) > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <div style={{ flex: 1, height: '6px', backgroundColor: 'var(--bg-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    height: '100%', 
+                    width: `${(salaries[m.id] / Object.values(salaries).reduce((a, b) => a + b, 0)) * 100}%`, 
+                    backgroundColor: 'var(--primary)',
+                    transition: 'width 0.3s ease'
+                  }}></div>
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', minWidth: '45px' }}>
+                  {((salaries[m.id] / Object.values(salaries).reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ marginTop: '2rem', backgroundColor: '#f0fdf4', border: '1px solid #bbfcce', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{ padding: '0.75rem', backgroundColor: '#dcfce7', borderRadius: '50%', color: '#166534' }}>
-          <TrendingUp size={24} />
+      <div className="card" style={{ marginTop: '2rem', backgroundColor: '#f0fdf4', border: '1px solid #bbfcce', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ padding: '0.75rem', backgroundColor: '#dcfce7', borderRadius: '50%', color: '#166534' }}>
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#166534' }}>Total Foyer</h3>
+            <p style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+              {Object.values(salaries).reduce((a, b) => a + b, 0).toFixed(2)} €
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#166534' }}>Total Foyer</h3>
-          <p style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-            {Object.values(salaries).reduce((a, b) => a + b, 0).toFixed(2)} €
-          </p>
+        
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {settings?.members?.map(m => (
+            <div key={m.id} style={{ textAlign: 'center' }}>
+               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>{m.name}</div>
+               <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)' }}>
+                 {Object.values(salaries).reduce((a,b) => a+b, 0) > 0 
+                  ? ((salaries[m.id] / Object.values(salaries).reduce((a,b) => a+b, 0)) * 100).toFixed(1)
+                  : 0}%
+               </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

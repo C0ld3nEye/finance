@@ -152,9 +152,10 @@ button {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
-  align-items: flex-end; /* Mobile Bottom Sheet */
+  align-items: center;
   justify-content: center;
   z-index: 2000;
+  padding: 1rem;
   animation: fadeInOverlay 0.3s ease-out forwards;
 }
 
@@ -166,21 +167,50 @@ button {
 .modal-content {
   width: 100%;
   max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background-color: var(--bg-color);
-  border-top-left-radius: var(--radius-xl);
-  border-top-right-radius: var(--radius-xl);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  padding: 2rem;
+  padding: 0;
   position: relative;
-  border-top: 1px solid var(--border-glass);
-  animation: modalSlideFromBottom 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border: 1px solid var(--border-glass);
+  animation: modalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes modalSlideFromBottom {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+.modal-content > .modal-header {
+  padding: 1.5rem 2rem 1rem;
+  flex-shrink: 0;
+}
+
+.modal-content > .modal-body {
+  padding: 0 2rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.modal-content > .modal-footer {
+  padding: 1rem 2rem 1.5rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+}
+
+/* Fallback: si pas de structure header/body/footer, le padding classique */
+.modal-content > form {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+@keyframes modalScaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 /* Glassmorphism Cards */

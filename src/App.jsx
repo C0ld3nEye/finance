@@ -11,6 +11,7 @@ import Salaries from './pages/Salaries';
 import Debts from './pages/Debts';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import { ConfirmProvider } from './context/ConfirmContext';
 import './index.css';
 
 function App() {
@@ -70,34 +71,35 @@ function App() {
       </Router>
     );
   }
-
   return (
-    <Router>
-      <div className="app-container">
-        <Sidebar />
-        <main className="main-content animate-fade-in">
-          <Routes>
-            {!householdId ? (
-              <>
-                <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
-                <Route path="*" element={<Navigate to="/settings" replace />} />
-              </>
-            ) : (
-              <>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard householdId={householdId} />} />
-                <Route path="/expenses" element={<Expenses householdId={householdId} />} />
-                <Route path="/charges" element={<Charges householdId={householdId} />} />
-                <Route path="/salaries" element={<Salaries householdId={householdId} />} />
-                <Route path="/debts" element={<Debts householdId={householdId} />} />
-                <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </>
-            )}
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <ConfirmProvider>
+      <Router>
+        <div className="app-container">
+          <Sidebar />
+          <main className="main-content animate-fade-in">
+            <Routes>
+              {!householdId ? (
+                <>
+                  <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
+                  <Route path="*" element={<Navigate to="/settings" replace />} />
+                </>
+              ) : (
+                <>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard householdId={householdId} />} />
+                  <Route path="/expenses" element={<Expenses householdId={householdId} />} />
+                  <Route path="/charges" element={<Charges householdId={householdId} />} />
+                  <Route path="/salaries" element={<Salaries householdId={householdId} />} />
+                  <Route path="/debts" element={<Debts householdId={householdId} />} />
+                  <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </>
+              )}
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </ConfirmProvider>
   );
 }
 

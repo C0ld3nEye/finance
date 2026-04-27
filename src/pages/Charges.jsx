@@ -10,6 +10,7 @@ import {
 import { useConfirm } from '../context/ConfirmContext';
 
 import { CATEGORY_CONFIG, CATEGORIES, getCategoryConfig } from '../constants/categories';
+import { calculateDistribution as calcDist } from '../utils/finance';
 
 const Charges = ({ householdId }) => {
   const [charges, setCharges] = useState([]);
@@ -95,57 +96,17 @@ const Charges = ({ householdId }) => {
     setCurrentDate(next);
   };
 
+  // Wrapper centralisé : utilise les salaires mensuels (prioritaires sur les salaires statiques du profil)
   const calculateDistribution = (amount, type, customDist = {}, customAmts = {}) => {
     if (!settings?.members || !amount || settings.members.length < 2) return {};
-    const numAmount = Number(amount);
-    const m1 = settings.members[0];
-    const m2 = settings.members[1];
-    
-    if (type === '50_50') {
-      return { [m1.id]: numAmount / 2, [m2.id]: numAmount / 2 };
-    }
-    if (type === 'prorata') {
-      const s1 = monthlySalaries?.salaries?.[m1.id] || 0;
-      const s2 = monthlySalaries?.salaries?.[m2.id] || 0;
-      const totalSalary = s1 + s2;
-      
-      if (totalSalary === 0) return { [m1.id]: numAmount / 2, [m2.id]: numAmount / 2 };
-      const m1Share = numAmount * (s1 / totalSalary);
-      const m2Share = numAmount * (s2 / totalSalary);
-      return { [m1.id]: m1Share, [m2.id]: m2Share };
-    }
-    if (type === 'custom') {
-      const dist = {};
-      settings.members.forEach(m => {
-        const pct = customDist[m.id] || 0;
-        dist[m.id] = (numAmount * pct) / 100;
-      });
-      return dist;
-    }
-    if (type === 'custom_amount') {
-      const dist = {};
-      settings.members.forEach(m => {
-        dist[m.id] = Number(customAmts[m.id] || 0);
-      });
-      return dist;
-    }
-    if (type === 'hybrid') {
-      const fixedSum = settings.members.reduce((acc, m) => acc + Number(customAmts[m.id] || 0), 0);
-      const remainder = Math.max(0, numAmount - fixedSum);
-      
-      const s1 = monthlySalaries?.salaries?.[m1.id] || 0;
-      const s2 = monthlySalaries?.salaries?.[m2.id] || 0;
-      const totalSalary = s1 + s2;
-      
-      const dist = {};
-      settings.members.forEach(m => {
-        const sal = monthlySalaries?.salaries?.[m.id] || 0;
-        const share = totalSalary > 0 ? (remainder * sal) / totalSalary : remainder / settings.members.length;
-        dist[m.id] = share + Number(customAmts[m.id] || 0);
-      });
-      return dist;
-    }
-    return {};
+    return calcDist(
+      amount,
+      type,
+      settings.members,
+      monthlySalaries?.salaries || {},
+      customDist,
+      customAmts
+    );
   };
 
   const handleAdd = async (e) => {
@@ -314,11 +275,11 @@ const Charges = ({ householdId }) => {
         </button>
       </header>
 
-      <div className="card" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-color)' }}>
+      <div className="month-nav">
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(-1)}>
           <ChevronLeft size={24} />
         </button>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'capitalize' }}>
+        <h2 className="month-nav-title">
           {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
         </h2>
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(1)}>

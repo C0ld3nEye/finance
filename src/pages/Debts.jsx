@@ -5,42 +5,51 @@ import { getSettings } from '../services/settings';
 import { getAllMonthlySalaries } from '../services/salaries';
 import { getAllSettlements, addSettlement, deleteSettlement } from '../services/settlements';
 import { auth } from '../config/firebase';
-import { ArrowUpDown, Landmark, User, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, History, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { ArrowUpDown, Landmark, User, CheckCircle2, Trash2, ChevronLeft, ChevronRight, History, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { calculateDistribution } from '../utils/finance';
 
-/* ── Petit composant accordéon réutilisable ── */
+/* ── Composant accordéon avec logique FIFO ── */
 const DetailAccordion = ({ details, settlements, currentMonth }) => {
   const [open, setOpen] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   if (!details || details.length === 0) return null;
+
+  const totalSettled = (settlements || []).reduce((s, r) => s + r.amount, 0);
 
   // Séparer mois courant et mois passés
   const currentMonthItems = details.filter(d => d.month === currentMonth);
-  const pastItems = details.filter(d => d.month !== currentMonth);
+  const pastItems = details
+    .filter(d => d.month !== currentMonth)
+    .sort((a, b) => a.month.localeCompare(b.month));
 
-  // Calculer si les arriérés passés sont soldés
-  const totalPastGross = pastItems.reduce((s, d) => s + d.share, 0);
-  const totalSettled = (settlements || []).reduce((s, r) => s + r.amount, 0);
-  const remainingArrears = Math.max(0, totalPastGross - totalSettled);
-  const hasUnpaidArrears = remainingArrears > 0.01;
+  // FIFO uniquement sur les mois passés : les règlements soldent du plus ancien au plus récent
+  let remainingBudget = totalSettled;
+  const processedPastItems = pastItems.map(item => {
+    if (remainingBudget <= 0) return { ...item, remaining: item.share };
+    if (remainingBudget >= item.share) {
+      remainingBudget -= item.share;
+      return { ...item, remaining: 0 };
+    }
+    const remaining = item.share - remainingBudget;
+    remainingBudget = 0;
+    return { ...item, remaining };
+  });
 
-  // Items à afficher : mois courant + arriérés non réglés
-  const visibleItems = hasUnpaidArrears && showHistory
-    ? details  // Tout afficher si on veut l'historique
-    : currentMonthItems;
+  // Seuls les arriérés réellement impayés sont affichés
+  const unpaidPastItems = processedPastItems.filter(item => item.remaining > 0.01);
+  const hasUnpaidArrears = unpaidPastItems.length > 0;
 
-  if (visibleItems.length === 0 && !hasUnpaidArrears) return null;
+  // Toujours visible si mois courant existe, même si tout est soldé pour les mois passés
+  if (currentMonthItems.length === 0 && !hasUnpaidArrears) return null;
 
-  const renderItems = (items) => {
+  const renderItems = (items, useRemaining = false) => {
     const byMonth = {};
     items.forEach(d => {
       if (!byMonth[d.month]) byMonth[d.month] = [];
       byMonth[d.month].push(d);
     });
-    const sortedMonths = Object.keys(byMonth).sort();
-
-    return sortedMonths.map(month => {
+    return Object.keys(byMonth).sort().map(month => {
       const monthItems = byMonth[month];
-      const monthTotal = monthItems.reduce((s, i) => s + i.share, 0);
+      const monthTotal = monthItems.reduce((s, i) => s + (useRemaining ? i.remaining : i.share), 0);
       const monthLabel = new Date(month + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
       const isPast = month !== currentMonth;
       return (
@@ -51,46 +60,61 @@ const DetailAccordion = ({ details, settlements, currentMonth }) => {
             paddingBottom: '0.25rem', marginBottom: '0.35rem',
             textTransform: 'capitalize', display: 'flex', justifyContent: 'space-between',
           }}>
-            <span>{monthLabel} {isPast && '(arriéré)'}</span>
+            <span>
+              {monthLabel}
+              {isPast && <span style={{ fontSize: '0.7rem', marginLeft: '0.4rem', opacity: 0.8 }}>(arriéré impayé)</span>}
+            </span>
             <span style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>
-              Sous-total : {monthTotal.toFixed(2)} €
+              {isPast ? 'Restant' : 'Sous-total'} : {monthTotal.toFixed(2)} €
             </span>
           </div>
-          {monthItems.map((d, i) => (
-            <div key={i} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '0.2rem 0',
-              borderBottom: i < monthItems.length - 1 ? '1px dotted var(--border-color, rgba(255,255,255,0.05))' : 'none',
-            }}>
-              <span style={{ color: 'var(--text-secondary)', flex: 1 }}>
-                <span style={{
-                  display: 'inline-block', width: '1.1rem', height: '1.1rem',
-                  borderRadius: '3px', textAlign: 'center', lineHeight: '1.1rem',
-                  fontSize: '0.65rem', fontWeight: '700', marginRight: '0.4rem',
-                  backgroundColor: d.type === 'charge' ? 'var(--info, #3b82f6)' : 'var(--warning, #f59e0b)',
-                  color: '#fff',
-                }}>
-                  {d.type === 'charge' ? 'C' : 'D'}
+          {monthItems.map((d, i) => {
+            const displayAmt = useRemaining ? d.remaining : d.share;
+            const isPartial = useRemaining && d.remaining < d.share - 0.01;
+            return (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.2rem 0',
+                borderBottom: i < monthItems.length - 1 ? '1px dotted var(--border-color, rgba(255,255,255,0.05))' : 'none',
+              }}>
+                <span style={{ color: 'var(--text-secondary)', flex: 1 }}>
+                  <span style={{
+                    display: 'inline-block', width: '1.1rem', height: '1.1rem',
+                    borderRadius: '3px', textAlign: 'center', lineHeight: '1.1rem',
+                    fontSize: '0.65rem', fontWeight: '700', marginRight: '0.4rem',
+                    backgroundColor: d.type === 'charge' ? 'var(--info, #3b82f6)' : 'var(--warning, #f59e0b)',
+                    color: '#fff',
+                  }}>
+                    {d.type === 'charge' ? 'C' : 'D'}
+                  </span>
+                  {d.name}
+                  <span style={{ opacity: 0.6, marginLeft: '0.3rem' }}>
+                    ({d.distributionType === '50_50' ? '50/50' : d.distributionType === 'prorata' ? 'prorata' : d.distributionType === 'hybrid' ? 'hybride' : d.distributionType === 'custom_amount' ? 'fixe' : 'perso'})
+                  </span>
                 </span>
-                {d.name}
-                <span style={{ opacity: 0.6, marginLeft: '0.3rem' }}>
-                  ({d.distributionType === '50_50' ? '50/50' : d.distributionType === 'prorata' ? 'prorata' : d.distributionType === 'hybrid' ? 'hybride' : d.distributionType === 'custom_amount' ? 'fixe' : 'perso'})
+                <span style={{ fontWeight: '600', whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>
+                  {isPartial ? (
+                    <>
+                      <span style={{ color: 'var(--warning)' }}>{displayAmt.toFixed(2)} €</span>
+                      <span style={{ opacity: 0.4, fontSize: '0.72rem', marginLeft: '0.2rem' }}>/{d.share.toFixed(2)} €</span>
+                    </>
+                  ) : (
+                    <>
+                      {displayAmt.toFixed(2)} €
+                      <span style={{ opacity: 0.4, fontWeight: '400', marginLeft: '0.2rem' }}>/ {Number(d.totalAmount).toFixed(2)} €</span>
+                    </>
+                  )}
                 </span>
-              </span>
-              <span style={{ fontWeight: '600', whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>
-                {d.share.toFixed(2)} €
-                <span style={{ opacity: 0.5, fontWeight: '400', marginLeft: '0.2rem' }}>
-                  / {Number(d.totalAmount).toFixed(2)} €
-                </span>
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       );
     });
   };
 
-  const displayedTotal = visibleItems.reduce((s, d) => s + d.share, 0);
+  const currentTotal = currentMonthItems.reduce((s, d) => s + d.share, 0);
+  const arrearsTotal = unpaidPastItems.reduce((s, d) => s + d.remaining, 0);
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
@@ -110,117 +134,43 @@ const DetailAccordion = ({ details, settlements, currentMonth }) => {
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
-      <div style={{
-        maxHeight: open ? '3000px' : '0',
-        overflow: 'hidden',
-        transition: 'max-height 0.4s ease',
-      }}>
+      <div style={{ maxHeight: open ? '3000px' : '0', overflow: 'hidden', transition: 'max-height 0.4s ease' }}>
         <div style={{
-          marginTop: '0.5rem',
-          padding: '0.75rem',
+          marginTop: '0.5rem', padding: '0.75rem',
           backgroundColor: 'var(--surface-color, rgba(0,0,0,0.15))',
-          borderRadius: 'var(--radius-sm, 6px)',
-          fontSize: '0.78rem',
-          lineHeight: '1.6',
+          borderRadius: 'var(--radius-sm, 6px)', fontSize: '0.78rem', lineHeight: '1.6',
         }}>
-          {/* Items du mois courant */}
-          {renderItems(visibleItems)}
 
-          {/* Bandeau arriérés résumé (si non déplié mais impayés) */}
-          {hasUnpaidArrears && !showHistory && (
+          {/* Mois courant — toujours affiché avec les montants bruts complets */}
+          {currentMonthItems.length > 0 && renderItems(currentMonthItems, false)}
+
+          {/* Arriérés impayés des mois passés (après FIFO) */}
+          {hasUnpaidArrears && (
             <div style={{
-              padding: '0.5rem 0.75rem',
-              backgroundColor: 'var(--danger-light, rgba(255,71,87,0.1))',
-              borderRadius: 'var(--radius-sm, 6px)',
-              marginBottom: '0.5rem',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              marginTop: currentMonthItems.length > 0 ? '0.5rem' : 0,
+              paddingTop: currentMonthItems.length > 0 ? '0.5rem' : 0,
+              borderTop: currentMonthItems.length > 0 ? '1px dashed var(--danger)' : 'none',
             }}>
-              <span style={{ color: 'var(--danger)', fontWeight: '600' }}>
-                + Arriérés non réglés des mois précédents
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontWeight: '700', color: 'var(--danger)' }}>{remainingArrears.toFixed(2)} €</span>
-                <button
-                  onClick={() => setShowHistory(true)}
-                  style={{
-                    background: 'none', border: '1px solid var(--danger)',
-                    borderRadius: '4px', padding: '0.2rem 0.5rem',
-                    color: 'var(--danger)', cursor: 'pointer', fontSize: '0.7rem',
-                    fontWeight: '600',
-                  }}
-                >
-                  Voir détail
-                </button>
+              <div style={{ color: 'var(--danger)', fontWeight: '700', marginBottom: '0.4rem', fontSize: '0.77rem' }}>
+                ⚠ Arriérés impayés des mois précédents
               </div>
+              {renderItems(unpaidPastItems, true)}
             </div>
-          )}
-
-          {/* Bouton pour replier l'historique */}
-          {hasUnpaidArrears && showHistory && (
-            <button
-              onClick={() => setShowHistory(false)}
-              style={{
-                background: 'none', border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-                borderRadius: '4px', padding: '0.25rem 0.6rem', marginBottom: '0.5rem',
-                color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.72rem',
-                fontWeight: '600', width: '100%', textAlign: 'center',
-              }}
-            >
-              Masquer l'historique des arriérés
-            </button>
           )}
 
           {/* Résumé */}
-          <div style={{
-            borderTop: '2px solid var(--primary)',
-            paddingTop: '0.5rem', marginTop: '0.5rem',
-            display: 'flex', justifyContent: 'space-between',
-            fontWeight: '700', fontSize: '0.85rem',
-          }}>
-            <span>Total brut {showHistory ? '(tout)' : '(mois en cours)'} :</span>
-            <span>{displayedTotal.toFixed(2)} €</span>
+          <div style={{ borderTop: '2px solid var(--primary)', paddingTop: '0.5rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '0.85rem' }}>
+            <span>Total mois en cours :</span>
+            <span>{currentTotal.toFixed(2)} €</span>
           </div>
-
-          {/* Arriérés résumés dans le total si pas dépliés */}
-          {hasUnpaidArrears && !showHistory && (
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontWeight: '600', fontSize: '0.82rem', color: 'var(--danger)',
-              paddingTop: '0.25rem',
-            }}>
+          {hasUnpaidArrears && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', fontSize: '0.82rem', color: 'var(--danger)', paddingTop: '0.25rem' }}>
               <span>+ Arriérés restants :</span>
-              <span>{remainingArrears.toFixed(2)} €</span>
+              <span>{arrearsTotal.toFixed(2)} €</span>
             </div>
           )}
 
-          {/* Règlements appliqués */}
-          {settlements && settlements.length > 0 && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <div style={{ fontWeight: '600', color: 'var(--success)', marginBottom: '0.25rem' }}>
-                Règlements déduits :
-              </div>
-              {settlements.map((s, i) => (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  padding: '0.15rem 0', color: 'var(--success)',
-                }}>
-                  <span>
-                    Versement ({new Date(s.year, s.month, 1).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })})
-                  </span>
-                  <span style={{ fontWeight: '600' }}>-{s.amount.toFixed(2)} €</span>
-                </div>
-              ))}
-              <div style={{
-                borderTop: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-                paddingTop: '0.35rem', marginTop: '0.35rem',
-                display: 'flex', justifyContent: 'space-between',
-                fontWeight: '700', fontSize: '0.85rem',
-              }}>
-                <span>Total après règlements :</span>
-                <span>{Math.max(0, details.reduce((s, d) => s + d.share, 0) - totalSettled).toFixed(2)} €</span>
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
@@ -231,6 +181,7 @@ const Debts = ({ householdId }) => {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [settings, setSettings] = useState(null);
+  const [settleInputs, setSettleInputs] = useState({});
   const [debtsData, setDebtsData] = useState({
     toCommon: {},
     toPartners: {},
@@ -288,55 +239,25 @@ const Debts = ({ householdId }) => {
         });
       });
 
-      const getMemberShares = (amount, distType, customPercentages, customAmounts, refDate) => {
-        let d = new Date(refDate);
-        const y = d.getFullYear();
-        const mon = d.getMonth();
-        const mSal = allSalaries.find(s => s.id === `${y}-${(mon + 1).toString().padStart(2, '0')}`);
+      const getMemberShares = (amount, distType, customPercentages, customAmounts, refDate) =>
+        calculateDistribution(amount, distType || '50_50', membersArr, {}, customPercentages, customAmounts, allSalaries, refDate);
 
-        const numAmount = Number(amount);
-        const m1 = membersArr[0];
-        const m2 = membersArr[1];
+      // Date de départ : première transaction connue, ou à défaut il y a 24 mois
+      const allDates = [
+        ...allExpenses.map(e => new Date(e.date || e.createdAt)),
+        ...allCharges.map(c => new Date(c.validFrom ? c.validFrom + '-01' : '9999-01-01')).filter(d => d.getFullYear() < 9999),
+      ].filter(d => !isNaN(d));
 
-        if (distType === '50_50') return { [m1.id]: numAmount / 2, [m2.id]: numAmount / 2 };
-        if (distType === 'prorata') {
-          const s1 = mSal?.salaries?.[m1.id] || 0;
-          const s2 = mSal?.salaries?.[m2.id] || 0;
-          const total = s1 + s2;
-          if (total === 0) return { [m1.id]: numAmount / 2, [m2.id]: numAmount / 2 };
-          return { [m1.id]: numAmount * (s1 / total), [m2.id]: numAmount * (s2 / total) };
-        }
-        if (distType === 'custom') {
-          const res = {};
-          membersArr.forEach(m => res[m.id] = (numAmount * (customPercentages?.[m.id] || 0)) / 100);
-          return res;
-        }
-        if (distType === 'custom_amount') {
-          const res = {};
-          membersArr.forEach(m => res[m.id] = Number(customAmounts?.[m.id] || 0));
-          return res;
-        }
-        if (distType === 'hybrid') {
-          const fixedSum = membersArr.reduce((acc, m) => acc + Number(customAmounts?.[m.id] || 0), 0);
-          const remainder = Math.max(0, numAmount - fixedSum);
-          
-          const s1 = mSal?.salaries?.[m1.id] || 0;
-          const s2 = mSal?.salaries?.[m2.id] || 0;
-          const total = s1 + s2;
-          
-          const res = {};
-          membersArr.forEach(m => {
-            const sal = mSal?.salaries?.[m.id] || 0;
-            const share = total > 0 ? (remainder * sal) / total : remainder / membersArr.length;
-            res[m.id] = share + Number(customAmounts?.[m.id] || 0);
-          });
-          return res;
-        }
-        return {};
-      };
+      const fallbackStart = new Date();
+      fallbackStart.setMonth(fallbackStart.getMonth() - 24);
+      fallbackStart.setDate(1);
 
-      const startYear = 2026;
-      const startMonth = 0;
+      const earliestDate = allDates.length > 0
+        ? new Date(Math.min(...allDates))
+        : fallbackStart;
+
+      const startYear = earliestDate.getFullYear();
+      const startMonth = earliestDate.getMonth();
       const endMonth = new Date(selectedYear, selectedMonth, 1);
 
       let currentLoopMonth = new Date(startYear, startMonth, 1);
@@ -447,12 +368,15 @@ const Debts = ({ householdId }) => {
     }
   };
 
-  const handleSettle = async (type, fromId, toId, amount) => {
-    if (amount <= 0) return;
+  const handleSettle = async (type, fromId, toId, defaultAmount) => {
+    const key = `${type}-${fromId}-${toId}`;
+    const amount = parseFloat(settleInputs[key] ?? defaultAmount);
+    if (!amount || amount <= 0) return;
     try {
       await addSettlement(householdId, {
         year: selectedYear, month: selectedMonth, fromId, toId, amount, type
       });
+      setSettleInputs(prev => { const n = {...prev}; delete n[key]; return n; });
       fetchData();
     } catch (error) {
       alert("Erreur lors du remboursement");
@@ -503,11 +427,11 @@ const Debts = ({ householdId }) => {
         <p style={{ color: 'var(--text-secondary)' }}>Récapitulatif cumulé de ce que chacun doit reverser</p>
       </header>
 
-      <div className="card" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-color)' }}>
+      <div className="month-nav">
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(-1)}>
           <ChevronLeft size={24} />
         </button>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'capitalize' }}>
+        <h2 className="month-nav-title">
           {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
         </h2>
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(1)}>
@@ -566,9 +490,22 @@ const Debts = ({ householdId }) => {
                   />
 
                   {total >= 0.01 && (
-                    <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem' }} onClick={() => handleSettle('common', m.id, accId, total)}>
-                      Solder {total.toFixed(2)} €
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={total}
+                        className="input-field"
+                        style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.75rem' }}
+                        placeholder={total.toFixed(2)}
+                        value={settleInputs[`common-${m.id}-${accId}`] ?? ''}
+                        onChange={e => setSettleInputs(prev => ({ ...prev, [`common-${m.id}-${accId}`]: e.target.value }))}
+                      />
+                      <button className="btn btn-primary" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }} onClick={() => handleSettle('common', m.id, accId, total)}>
+                        Solder
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -608,9 +545,22 @@ const Debts = ({ householdId }) => {
                   />
 
                   {total >= 0.01 && (
-                    <button className="btn btn-outline" style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem' }} onClick={() => handleSettle('partner', m.id, partnerId, total)}>
-                      Rembourser {total.toFixed(2)} €
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        max={total}
+                        className="input-field"
+                        style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.75rem' }}
+                        placeholder={total.toFixed(2)}
+                        value={settleInputs[`partner-${m.id}-${partnerId}`] ?? ''}
+                        onChange={e => setSettleInputs(prev => ({ ...prev, [`partner-${m.id}-${partnerId}`]: e.target.value }))}
+                      />
+                      <button className="btn btn-outline" style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }} onClick={() => handleSettle('partner', m.id, partnerId, total)}>
+                        Rembourser
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -632,7 +582,7 @@ const Debts = ({ householdId }) => {
                 {s.type === 'common' ? 'au compte commun' : `à ${settings.members.find(m => m.id === s.toId)?.name}`}
               </div>
               <button onClick={() => deleteSettle(s.id)} style={{ color: 'var(--danger)', padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer' }}>
-                <AlertCircle size={18} />
+                <Trash2 size={16} />
               </button>
             </div>
           ))}

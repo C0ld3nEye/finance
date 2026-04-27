@@ -3,6 +3,7 @@ import { getSettings, updateSettings, updateUserProfile } from '../services/sett
 import { auth } from '../config/firebase';
 import { Save, Plus, Trash2, Home, Users, Lock } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { repairAllCategories } from '../utils/categoryRepair';
 
 const Settings = ({ householdId, onHouseholdUpdate }) => {
   const [settings, setSettings] = useState(null);
@@ -36,7 +37,6 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     setSaving(true);
     try {
       const uid = auth.currentUser?.uid;
-      await updateUserProfile(uid, { householdId: hIdInput.trim() });
       await updateUserProfile(uid, { householdId: hIdInput.trim() });
       onHouseholdUpdate(hIdInput.trim());
       await alert({ 
@@ -264,45 +264,11 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
           className="btn btn-outline" 
           style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }}
           onClick={async () => {
-             const MAPPING = {
-               'Alimentation': ['course', 'carrefour', 'leclerc', 'lidl', 'monoprix', 'boulangerie', 'picard', 'resto', 'intermarche', 'super u', 'aldi', 'franprix', 'casino', 'auchan', 'mcdo', 'burger king', 'pizza', 'deliveroo', 'uber eats'],
-               'Logement': ['loyer', 'credit', 'pret immo', 'edf', 'engie', 'eau', 'habitation', 'copro'],
-               'Transport': ['essence', 'total', 'esso', 'peage', 'parking', 'sncf', 'train', 'bus', 'metro', 'ratp', 'voiture', 'garage'],
-               'Abonnements': ['netflix', 'spotify', 'amazon', 'prime', 'internet', 'box', 'sfr', 'orange', 'bouygues', 'free', 'telephone', 'canal', 'deezer', 'icloud', 'disney'],
-               'Santé': ['pharmacie', 'medecin', 'mutuelle', 'dentiste', 'opticien', 'doctolib'],
-               'Loisirs': ['cine', 'cinema', 'jeu', 'steam', 'playstation', 'nintendo', 'sortie', 'parc'],
-               'Cadeaux': ['cadeau', 'anniversaire', 'noel'],
-               'Animaux': ['veto', 'veterinaire', 'croquettes', 'chien', 'chat', 'maxizoo'],
-               'Sport': ['gym', 'fitness', 'club', 'sport', 'tennis', 'foot', 'piscine']
-             };
-             
-             const updateCat = async (coll) => {
-               const { collection, getDocs, updateDoc } = await import('firebase/firestore');
-               const { db } = await import('../config/firebase');
-               const snap = await getDocs(collection(db, 'households', householdId, coll));
-               let count = 0;
-               for (const d of snap.docs) {
-                 const data = d.data();
-                 if (!data.category || data.category === 'Autre') {
-                   const n = (data.description || data.name || '').toLowerCase();
-                   for (const [cat, keywords] of Object.entries(MAPPING)) {
-                     if (keywords.some(k => n.includes(k))) {
-                        await updateDoc(d.ref, { category: cat });
-                        count++;
-                        break;
-                     }
-                   }
-                 }
-               }
-               return count;
-             };
-
               try {
-                const expCount = await updateCat('expenses');
-                const charCount = await updateCat('charges');
+                const count = await repairAllCategories(householdId);
                 await alert({
                   title: 'Réparation terminée',
-                  message: `${expCount + charCount} éléments ont été catégorisés automatiquement.`,
+                  message: `${count} éléments ont été catégorisés automatiquement.`,
                   variant: 'success',
                   icon: 'settings'
                 });

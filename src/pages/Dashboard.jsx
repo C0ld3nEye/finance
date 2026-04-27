@@ -9,6 +9,7 @@ import { auth } from '../config/firebase';
 import { PieChart as ChartIcon, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, User, Lock } from 'lucide-react';
 import { CategoryPieChart, MonthlyTrendChart } from '../components/AnalyticsCharts';
 import { getCategoryKey } from '../constants/categories';
+import { calculateDistribution } from '../utils/finance';
 
 const Dashboard = ({ householdId }) => {
   const navigate = useNavigate();
@@ -86,26 +87,13 @@ const Dashboard = ({ householdId }) => {
       const tPersoCharges = currentPersoCharges.reduce((acc, curr) => acc + curr.amount, 0);
       
       const tIncome = mSal?.salaries ? Object.values(mSal.salaries).reduce((a, b) => a + b, 0) : 0;
+      const salairesSaisis = !!mSal?.salaries && Object.values(mSal.salaries).some(v => v > 0);
 
       // 3. Dette & Historique (Calcul différentiel)
       const membersArr = settingsData.members;
-      const getShares = (amount, distType, customPerc, refKey) => {
-        const s = allSalaries.find(xs => xs.id === refKey);
-        const numAmount = Number(amount);
-        if (distType === '50_50' || !distType) return { [membersArr[0]?.id]: numAmount/2, [membersArr[1]?.id]: numAmount/2 };
-        if (distType === 'prorata') {
-          const s1 = s?.salaries?.[membersArr[0]?.id] || 0;
-          const s2 = s?.salaries?.[membersArr[1]?.id] || 0;
-          if (s1+s2 === 0) return { [membersArr[0]?.id]: numAmount/2, [membersArr[1]?.id]: numAmount/2 };
-          return { [membersArr[0]?.id]: numAmount * (s1/(s1+s2)), [membersArr[1]?.id]: numAmount * (s2/(s1+s2)) };
-        }
-        if (distType === 'custom') {
-          const res = {};
-          membersArr.forEach(m => res[m.id] = (numAmount * (customPerc?.[m.id] || 0)) / 100);
-          return res;
-        }
-        return {};
-      };
+      // Utilise calculateDistribution centralisé (utils/finance.js)
+      const getShares = (amount, distType, customPerc, refKey, customAmts = {}) =>
+        calculateDistribution(amount, distType || '50_50', membersArr, {}, customPerc, customAmts, allSalaries, new Date(refKey + '-15'));
 
       const categoryTotals = {};
       const trendMap = {};
@@ -129,7 +117,7 @@ const Dashboard = ({ householdId }) => {
           const to = (c.validTo || '').slice(0, 7) || '9999-12';
           return mkey >= from && mkey <= to;
         }).forEach(c => {
-          const shares = getShares(c.amount, c.distributionType, c.customPercentages, mkey);
+          const shares = getShares(c.amount, c.distributionType, c.customPercentages, mkey, c.customAmounts);
           const share = shares[uid] || 0;
           const vis = getItemVisibility(c);
           const account = settingsData.accounts.find(a => a.id === c.accountId);
@@ -163,7 +151,7 @@ const Dashboard = ({ householdId }) => {
           const eKey = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
           return eKey === mkey;
         }).forEach(e => {
-          const shares = getShares(e.amount, e.distributionType, e.customPercentages, mkey);
+          const shares = getShares(e.amount, e.distributionType, e.customPercentages, mkey, e.customAmounts);
           const share = shares[uid] || 0;
           const vis = getItemVisibility(e);
           const account = settingsData.accounts.find(a => a.id === e.accountId);
@@ -210,9 +198,13 @@ const Dashboard = ({ householdId }) => {
         })
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-      // Dette Nette Finale : (Dettes passées + Dettes présentes) - (Règlements déjà faits - Règlements reçus)
-      // On simplifie pour avoir : (Somme des shares dues - Somme des shares créancières) - (Virements nets)
-      const netDebt = (totalArrears + totalCurrentMonthOwed) - (myPaid - myReceived);
+      const netPaid = myPaid - myReceived;
+
+      // FIFO : les règlements couvrent d'abord les arriérés passés, puis le mois courant
+      const remainingArrears = Math.max(0, totalArrears - netPaid);
+
+      // Dette nette finale
+      const netDebt = (totalArrears + totalCurrentMonthOwed) - netPaid;
 
       setData({
         houseExpenses: tHouseExpenses,
@@ -220,10 +212,11 @@ const Dashboard = ({ householdId }) => {
         persoExpenses: tPersoExpenses,
         persoCharges: tPersoCharges,
         totalIncome: tIncome,
-        remaining: tIncome - tHouseCharges - tHouseExpenses,
+        salairesSaisis,
+        remaining: salairesSaisis ? tIncome - tHouseCharges - tHouseExpenses : null,
         myMonthlyHouseContribution,
         myPendingDebt: netDebt,
-        myPendingArrears: totalArrears,
+        myPendingArrears: remainingArrears,
         mySalary: mSal?.salaries?.[uid] || 0,
         categoryData: categoryTotals,
         trendData: Object.values(trendMap)
@@ -279,7 +272,11 @@ const Dashboard = ({ householdId }) => {
             <h3 className="label" style={{ margin: 0 }}>Reste Foyer</h3>
             <div className="icon-badge-success"><TrendingUp size={20} /></div>
           </div>
-          <p className="value-large" style={{ color: data.remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{data.remaining.toFixed(2)} €</p>
+          {data.remaining === null ? (
+            <span className="error-text">⚠ Saisissez les salaires du mois pour calculer le reste</span>
+          ) : (
+            <p className="value-large" style={{ color: data.remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{data.remaining.toFixed(2)} €</p>
+          )}
         </div>
       </div>
 
@@ -304,15 +301,20 @@ const Dashboard = ({ householdId }) => {
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 className="label" style={{ margin: 0 }}>{data.myPendingDebt >= 0 ? 'Ma Dette (Balance)' : 'Mon Crédit (Balance)'}</h3>
+            <h3 className="label" style={{ margin: 0 }}>Balance Foyer</h3>
             <button onClick={() => navigate('/debts')} className="btn-small">Régler</button>
           </div>
-          <p className="value-large" style={{ color: data.myPendingDebt >= 0 ? 'var(--warning)' : 'var(--success)' }}>
-            {Math.abs(data.myPendingDebt).toFixed(2)} €
+          <p className="value-large" style={{ color: data.myPendingDebt > 0 ? 'var(--warning)' : data.myPendingDebt < 0 ? 'var(--success)' : 'var(--text-secondary)' }}>
+            {data.myPendingDebt > 0 ? '−' : data.myPendingDebt < 0 ? '+' : ''}{Math.abs(data.myPendingDebt).toFixed(2)} €
           </p>
-          <span style={{ fontSize: '0.85rem', color: data.myPendingArrears > 0 ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: data.myPendingArrears > 0 ? '600' : '400' }}>
-            {data.myPendingArrears > 0 ? `Incluant ${data.myPendingArrears.toFixed(2)} € d'arriérés` : 'Historique à jour !'}
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            {data.myPendingDebt > 0 ? 'Vous devez reverser au foyer' : data.myPendingDebt < 0 ? 'Le foyer vous doit' : 'Tout est à jour !'}
           </span>
+          {data.myPendingArrears > 0 && (
+            <span style={{ fontSize: '0.82rem', color: 'var(--danger)', fontWeight: '600' }}>
+              Dont {data.myPendingArrears.toFixed(2)} € d'arriérés
+            </span>
+          )}
         </div>
         
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -339,13 +341,37 @@ const Dashboard = ({ householdId }) => {
         </div>
       </div>
 
-      <div className="card animate-fade-in">
-         <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>État des Finances</h2>
-         <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', fontSize: '1.1rem' }}>
-           Vous avez un reste à vivre de <strong style={{color: 'var(--text-primary)'}}>{data.remaining.toFixed(2)} €</strong> pour l'instant ce mois-ci, après soustraction de toutes vos charges fixes théoriques et de vos dépenses courantes déjà saisies enregistrées. 
-           {data.remaining < 0 && <span style={{color: 'var(--danger)', fontWeight: '600'}}> Attention, votre budget du mois a été dépassé !</span>}
-         </p>
-      </div>
+      {(data.remaining < 0 || data.myPendingArrears > 0 || !data.salairesSaisis || data.myPendingDebt > 100) && (
+        <div className="card animate-fade-in">
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>Points d'attention</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {!data.salairesSaisis && (
+              <div className="alert-banner alert-banner-info">
+                <span style={{ fontSize: '1rem' }}>💡</span>
+                <span>Les salaires de ce mois ne sont pas encore saisis — le reste foyer ne peut pas être calculé. <button onClick={() => navigate('/salaries')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Saisir</button></span>
+              </div>
+            )}
+            {data.remaining !== null && data.remaining < 0 && (
+              <div className="alert-banner alert-banner-danger">
+                <span style={{ fontSize: '1rem' }}>⚠️</span>
+                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>Budget foyer dépassé de {Math.abs(data.remaining).toFixed(2)} € ce mois-ci.</span>
+              </div>
+            )}
+            {data.myPendingArrears > 0 && (
+              <div className="alert-banner alert-banner-danger">
+                <span style={{ fontSize: '1rem' }}>🔴</span>
+                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{data.myPendingArrears.toFixed(2)} € d'arriérés non soldés sur des mois précédents. <button onClick={() => navigate('/debts')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Voir</button></span>
+              </div>
+            )}
+            {data.myPendingDebt > 100 && data.myPendingArrears === 0 && (
+              <div className="alert-banner alert-banner-warning">
+                <span style={{ fontSize: '1rem' }}>🟡</span>
+                <span>Vous avez {data.myPendingDebt.toFixed(2)} € à reverser au foyer ce mois-ci.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       </div>
   );
 };

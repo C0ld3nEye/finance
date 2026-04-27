@@ -343,3 +343,107 @@ button {
 .animate-fade-in {
   animation: fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ─── Utilitaires de mise en page ─────────────────────────────── */
+
+/* Bandeau d'alerte avec bordure colorée à gauche */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+.alert-banner-info    { background-color: var(--primary-light);  border-left-color: var(--primary); }
+.alert-banner-warning { background-color: var(--warning-light);  border-left-color: var(--warning); }
+.alert-banner-danger  { background-color: var(--danger-light);   border-left-color: var(--danger);  }
+.alert-banner-success { background-color: var(--success-light);  border-left-color: var(--success); }
+
+/* Sous-section interne à une card (fond légèrement distinct) */
+.card-inner {
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+}
+.card-inner-accent {
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--primary);
+}
+
+/* Navigation mois (chevrons gauche / titre / chevrons droite) */
+.month-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  background-color: var(--surface-color);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-glass);
+}
+.month-nav-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: capitalize;
+}
+
+/* Avatar initiale */
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Badge type de répartition */
+.dist-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+/* État vide (empty state) */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+}
+
+/* Label de formulaire standard */
+.form-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* Ligne de détail (libellé + valeur sur une même ligne) */
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+}
+.detail-row + .detail-row {
+  border-top: 1px dotted var(--border-color);
+}
+

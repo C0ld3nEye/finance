@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getExpensesByMonth, addExpense, deleteExpense, updateExpense } from '../services/expenses';
+import { getMonthlySalaries } from '../services/salaries';
 import { format, addMonths, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getSettings } from '../services/settings';
@@ -11,11 +12,13 @@ import {
 import { useConfirm } from '../context/ConfirmContext';
 
 import { CATEGORY_CONFIG, CATEGORIES, getCategoryConfig } from '../constants/categories';
+import { calculateDistribution as calcDist } from '../utils/finance';
 
 const Expenses = ({ householdId }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [monthlySalaries, setMonthlySalaries] = useState(null);
   const [loading, setLoading] = useState(true);
   const { confirm } = useConfirm();
   
@@ -48,12 +51,14 @@ const Expenses = ({ householdId }) => {
     try {
       const year = date.getFullYear();
       const month = date.getMonth();
-      const [expensesData, settingsData] = await Promise.all([
+      const [expensesData, settingsData, mSalaries] = await Promise.all([
         getExpensesByMonth(householdId, uid, year, month),
-        getSettings(householdId)
+        getSettings(householdId),
+        getMonthlySalaries(householdId, year, month)
       ]);
       setExpenses(expensesData);
       setSettings(settingsData);
+      setMonthlySalaries(mSalaries);
       
       // Auto-select first member and first account if not set
       // Only show shared accounts + mine
@@ -74,43 +79,17 @@ const Expenses = ({ householdId }) => {
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
 
-  const calculateDistribution = (amount, type, customDist, customAmts = {}) => {
-    const numAmount = Number(amount);
-    if (type === '50_50') {
-      const half = numAmount / 2;
-      const res = {};
-      settings.members.forEach(m => res[m.id] = half);
-      return res;
-    }
-    if (type === 'prorata') {
-      const res = {};
-      const totalSal = settings.members.reduce((acc, m) => acc + (m.salary || 0), 0);
-      settings.members.forEach(m => res[m.id] = totalSal > 0 ? (numAmount * (m.salary || 0)) / totalSal : numAmount / 2);
-      return res;
-    }
-    if (type === 'custom') {
-      const res = {};
-      settings.members.forEach(m => res[m.id] = (numAmount * (customDist[m.id] || 0)) / 100);
-      return res;
-    }
-    if (type === 'custom_amount') {
-      const res = {};
-      settings.members.forEach(m => res[m.id] = Number(customAmts[m.id] || 0));
-      return res;
-    }
-    if (type === 'hybrid') {
-      const fixedSum = settings.members.reduce((acc, m) => acc + Number(customAmts[m.id] || 0), 0);
-      const remainder = Math.max(0, numAmount - fixedSum);
-      
-      const res = {};
-      const totalSal = settings.members.reduce((acc, m) => acc + (m.salary || 0), 0);
-      settings.members.forEach(m => {
-        const share = totalSal > 0 ? (remainder * (m.salary || 0)) / totalSal : remainder / settings.members.length;
-        res[m.id] = share + Number(customAmts[m.id] || 0);
-      });
-      return res;
-    }
-    return {};
+  // Wrapper autour de l'utilitaire centralisé : utilise les salaires mensuels (prioritaires sur les salaires statiques)
+  const calculateDistribution = (amount, type, customDist = {}, customAmts = {}) => {
+    if (!settings?.members) return {};
+    return calcDist(
+      amount,
+      type,
+      settings.members,
+      monthlySalaries?.salaries || {},
+      customDist,
+      customAmts
+    );
   };
 
   const handleAdd = async (e) => {
@@ -257,11 +236,11 @@ const Expenses = ({ householdId }) => {
       </header>
       
       {/* Month Selector */}
-      <div className="card" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem' }}>
+      <div className="month-nav">
         <button onClick={handlePrevMonth} className="btn btn-outline" style={{ border: 'none' }}>
            <ChevronLeft size={24} />
         </button>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', textTransform: 'capitalize' }}>
+        <h2 className="month-nav-title">
           {format(currentDate, 'MMMM yyyy', { locale: fr })}
         </h2>
         <button onClick={handleNextMonth} className="btn btn-outline" style={{ border: 'none' }}>
@@ -521,10 +500,10 @@ const Expenses = ({ householdId }) => {
                         
                         {(expense.distributionType === 'prorata' || expense.distributionType === 'hybrid') && (
                           <div style={{ fontSize: '0.72rem', backgroundColor: 'var(--primary-light)', padding: '0.5rem', borderRadius: '4px', color: 'var(--primary)' }}>
-                            <strong>Base de calcul (Revenus) :</strong><br/>
+                            <strong>Base de calcul (Revenus du mois) :</strong><br/>
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem' }}>
                               {settings?.members?.map(m => (
-                                <span key={m.id}>{m.name} : {Number(m.salary || 0).toFixed(0)}€</span>
+                                <span key={m.id}>{m.name} : {Number(monthlySalaries?.salaries?.[m.id] || m.salary || 0).toFixed(0)}€</span>
                               ))}
                             </div>
                           </div>

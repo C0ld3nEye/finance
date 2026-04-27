@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getSettings } from '../services/settings';
 import { getMonthlySalaries, updateMonthlySalaries } from '../services/salaries';
 import { auth } from '../config/firebase';
@@ -12,6 +12,11 @@ const Salaries = ({ householdId }) => {
   const [salaries, setSalaries] = useState({});
   const [saving, setSaving] = useState(false);
   const { alert } = useConfirm();
+
+  const totalSalary = useMemo(
+    () => Object.values(salaries).reduce((a, b) => a + b, 0),
+    [salaries]
+  );
 
   useEffect(() => {
     fetchData();
@@ -87,11 +92,11 @@ const Salaries = ({ householdId }) => {
         </button>
       </header>
 
-      <div className="card" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--primary-light)', borderColor: 'var(--primary)', borderWidth: '1px', borderStyle: 'solid' }}>
+      <div className="month-nav">
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(-1)}>
           <ChevronLeft size={24} />
         </button>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'capitalize' }}>
+        <h2 className="month-nav-title">
           {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
         </h2>
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(1)}>
@@ -124,18 +129,18 @@ const Salaries = ({ householdId }) => {
               <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: '700', color: 'var(--text-secondary)' }}>€</span>
             </div>
 
-            {Object.values(salaries).reduce((a, b) => a + b, 0) > 0 && (
+            {totalSalary > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
                 <div style={{ flex: 1, height: '6px', backgroundColor: 'var(--bg-color)', borderRadius: '3px', overflow: 'hidden' }}>
                   <div style={{ 
                     height: '100%', 
-                    width: `${(salaries[m.id] / Object.values(salaries).reduce((a, b) => a + b, 0)) * 100}%`, 
+                    width: `${(salaries[m.id] / totalSalary) * 100}%`, 
                     backgroundColor: 'var(--primary)',
                     transition: 'width 0.3s ease'
                   }}></div>
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', minWidth: '45px' }}>
-                  {((salaries[m.id] / Object.values(salaries).reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%
+                  {((salaries[m.id] / totalSalary) * 100).toFixed(1)}%
                 </span>
               </div>
             )}
@@ -151,7 +156,7 @@ const Salaries = ({ householdId }) => {
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#166534' }}>Total Foyer</h3>
             <p style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-              {Object.values(salaries).reduce((a, b) => a + b, 0).toFixed(2)} €
+              {totalSalary.toFixed(2)} €
             </p>
           </div>
         </div>
@@ -161,8 +166,8 @@ const Salaries = ({ householdId }) => {
             <div key={m.id} style={{ textAlign: 'center' }}>
                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>{m.name}</div>
                <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)' }}>
-                 {Object.values(salaries).reduce((a,b) => a+b, 0) > 0 
-                  ? ((salaries[m.id] / Object.values(salaries).reduce((a,b) => a+b, 0)) * 100).toFixed(1)
+                 {totalSalary > 0 
+                  ? ((salaries[m.id] / totalSalary) * 100).toFixed(1)
                   : 0}%
                </div>
             </div>

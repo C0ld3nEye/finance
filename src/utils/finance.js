@@ -103,9 +103,65 @@ export const formatEuro = (value) => `${Number(value || 0).toFixed(2)} €`;
  */
 export const getMonthlyAmount = (charge) => {
   if (charge.frequency === 'annual') {
-    // annualAmount est le montant brut annuel, amount est déjà le 1/12 calculé au formulaire
-    // On s'assure de toujours utiliser amount (déjà lissé) pour les calculs mensuels
     return Number(charge.amount || 0);
   }
   return Number(charge.amount || 0);
+};
+
+const MONTH_NAMES_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+/**
+ * Convertit un nom de mois français en index 0-based.
+ * @param {string} monthName - Ex: "Octobre"
+ * @returns {number} Index 0-based, ou -1 si non trouvé.
+ */
+export const frMonthToIndex = (monthName) => MONTH_NAMES_FR.indexOf(monthName);
+
+/**
+ * Calcule l'état de provision d'une charge annuelle pour un mois donné.
+ *
+ * Principe : chaque mois, charge.amount (= annualAmount / 12) est mis de côté.
+ * À la fin du mois d'échéance, la totalité du montant annuel doit être provisionnée.
+ *
+ * @param {Object} charge - { amount, annualAmount, annualDueDate, validFrom }
+ * @param {number} currentYear
+ * @param {number} currentMonth - Index 0-based
+ * @returns {{
+ *   provisioned: number,
+ *   total: number,
+ *   remaining: number,
+ *   progressPct: number,
+ *   dueMonthIndex: number,
+ *   monthsUntilDue: number,
+ *   isDueThisMonth: boolean,
+ *   isOverdue: boolean,
+ * }}
+ */
+export const getAnnualChargeProgress = (charge, currentYear, currentMonth) => {
+  const total = Number(charge.annualAmount || 0);
+  const monthly = Number(charge.amount || 0);
+  const dueMonthIndex = frMonthToIndex(charge.annualDueDate);
+
+  let provisioned = 0;
+  if (charge.validFrom) {
+    const [fromYear, fromMonthRaw] = charge.validFrom.split('-').map(Number);
+    const fromMonth = fromMonthRaw - 1;
+    const monthsElapsed = (currentYear - fromYear) * 12 + (currentMonth - fromMonth) + 1;
+    provisioned = Math.min(Math.max(monthsElapsed, 0) * monthly, total);
+  }
+
+  const remaining = Math.max(total - provisioned, 0);
+  const progressPct = total > 0 ? Math.min((provisioned / total) * 100, 100) : 0;
+
+  let monthsUntilDue = -1;
+  let isDueThisMonth = false;
+  let isOverdue = false;
+
+  if (dueMonthIndex >= 0) {
+    monthsUntilDue = dueMonthIndex - currentMonth;
+    isDueThisMonth = dueMonthIndex === currentMonth;
+    isOverdue = monthsUntilDue < 0 && remaining > 0;
+  }
+
+  return { provisioned, total, remaining, progressPct, dueMonthIndex, monthsUntilDue, isDueThisMonth, isOverdue };
 };

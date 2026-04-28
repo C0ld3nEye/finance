@@ -10,7 +10,8 @@ import {
 import { useConfirm } from '../context/ConfirmContext';
 
 import { CATEGORY_CONFIG, CATEGORIES, getCategoryConfig } from '../constants/categories';
-import { calculateDistribution as calcDist } from '../utils/finance';
+import { calculateDistribution as calcDist, getAnnualChargeProgress } from '../utils/finance';
+import { ListPageSkeleton } from '../components/SkeletonLoader';
 
 const Charges = ({ householdId }) => {
   const [charges, setCharges] = useState([]);
@@ -261,7 +262,7 @@ const Charges = ({ householdId }) => {
     return acc ? acc.name : 'Inconnu';
   };
 
-  if (loading) return <div className="page-container" style={{ padding: '2rem' }}><p>Chargement des charges...</p></div>;
+  if (loading) return <ListPageSkeleton rows={5} />;
 
   return (
     <div className="page-container animate-fade-in">
@@ -561,8 +562,30 @@ const Charges = ({ householdId }) => {
                   </span>
                   <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     Le {charge.dueDate || 1} • {getAccountName(charge.accountId)}
-                    {charge.frequency === 'annual' && <span style={{ padding: '0.1rem 0.4rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>Annuelle lissée</span>}
+                    {charge.frequency === 'annual' && <span className="dist-badge">Annuelle lissée</span>}
                   </span>
+                  {charge.frequency === 'annual' && (() => {
+                    const prog = getAnnualChargeProgress(charge, selectedYear, selectedMonth);
+                    return (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                          <span>Provision : {prog.provisioned.toFixed(0)} € / {prog.total.toFixed(0)} €</span>
+                          <span style={{ fontWeight: '600', color: prog.isDueThisMonth ? 'var(--danger)' : prog.monthsUntilDue === 1 ? 'var(--warning)' : 'var(--text-secondary)' }}>
+                            {prog.isDueThisMonth ? '⚠ Échéance ce mois !' : prog.monthsUntilDue > 0 ? `Échéance dans ${prog.monthsUntilDue} mois` : ''}
+                          </span>
+                        </div>
+                        <div style={{ height: '5px', backgroundColor: 'var(--bg-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${prog.progressPct}%`,
+                            borderRadius: '3px',
+                            backgroundColor: prog.progressPct >= 100 ? 'var(--success)' : prog.isDueThisMonth ? 'var(--danger)' : prog.monthsUntilDue === 1 ? 'var(--warning)' : 'var(--primary)',
+                            transition: 'width 0.4s ease'
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
@@ -589,19 +612,68 @@ const Charges = ({ householdId }) => {
               }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                   <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                    {charge.frequency === 'annual' && (
-                      <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                        <p style={{ fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--primary)' }}>Détails de la charge annuelle :</p>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>Montant total :</span>
-                          <span style={{ fontWeight: '600' }}>{Number(charge.annualAmount || 0).toFixed(2)} €</span>
+                    {charge.frequency === 'annual' && (() => {
+                      const prog = getAnnualChargeProgress(charge, selectedYear, selectedMonth);
+                      return (
+                        <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
+                          <p style={{ fontWeight: '600', marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--primary)' }}>Provision annuelle</p>
+                          <div className="detail-row">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Montant total</span>
+                            <span style={{ fontWeight: '700' }}>{prog.total.toFixed(2)} €</span>
+                          </div>
+                          <div className="detail-row">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Mensualité provisionnée</span>
+                            <span style={{ fontWeight: '600' }}>{Number(charge.amount).toFixed(2)} € / mois</span>
+                          </div>
+                          <div className="detail-row">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Mois d'échéance</span>
+                            <span style={{ fontWeight: '600' }}>{charge.annualDueDate || 'Non spécifié'}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Déjà provisionné</span>
+                            <span style={{ fontWeight: '700', color: 'var(--success)' }}>{prog.provisioned.toFixed(2)} €</span>
+                          </div>
+                          <div className="detail-row">
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Reste à provisionner</span>
+                            <span style={{ fontWeight: '700', color: prog.remaining > 0 ? 'var(--warning)' : 'var(--success)' }}>{prog.remaining.toFixed(2)} €</span>
+                          </div>
+                          <div style={{ marginTop: '0.75rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+                              <span>{prog.progressPct.toFixed(0)} % provisionné</span>
+                              {prog.isDueThisMonth && <span style={{ color: 'var(--danger)', fontWeight: '700' }}>⚠ Échéance ce mois !</span>}
+                              {prog.monthsUntilDue === 1 && <span style={{ color: 'var(--warning)', fontWeight: '600' }}>⚡ Échéance le mois prochain</span>}
+                            </div>
+                            <div style={{ height: '8px', backgroundColor: 'var(--bg-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${prog.progressPct}%`,
+                                borderRadius: '4px',
+                                backgroundColor: prog.progressPct >= 100 ? 'var(--success)' : prog.isDueThisMonth ? 'var(--danger)' : prog.monthsUntilDue === 1 ? 'var(--warning)' : 'var(--primary)',
+                                transition: 'width 0.4s ease'
+                              }} />
+                            </div>
+                          </div>
+                          {settings?.members && (() => {
+                            const members = settings.members;
+                            const dist = calcDist(charge.amount, charge.distributionType, members, {}, charge.customPercentages, charge.customAmounts);
+                            const annualDist = calcDist(charge.annualAmount || 0, charge.distributionType, members, {}, charge.customPercentages, charge.customAmounts);
+                            return (
+                              <div style={{ marginTop: '1rem' }}>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.4rem', fontWeight: '600' }}>Part par membre (mensuel → annuel)</p>
+                                {members.map(m => (
+                                  <div key={m.id} className="detail-row">
+                                    <span style={{ fontSize: '0.85rem' }}>{m.name}</span>
+                                    <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>
+                                      {(dist[m.id] || 0).toFixed(2)} € / mois → <span style={{ color: 'var(--primary)' }}>{(annualDist[m.id] || 0).toFixed(2)} € / an</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>Mois d'échéance :</span>
-                          <span style={{ fontWeight: '600' }}>{charge.annualDueDate || 'Non spécifié'}</span>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                      <p style={{ fontWeight: '600', marginBottom: '0.75rem', fontSize: '0.9rem', color: 'var(--primary)' }}>Détails de la répartition :</p>
                     
                     <div style={{ marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px dashed var(--border-color)' }}>

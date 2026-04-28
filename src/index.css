@@ -4,6 +4,7 @@
   /* Mode Clair Premium (Verre et Lumière) */
   --bg-color: #f4f6fa;
   --surface-color: rgba(255, 255, 255, 0.85);
+  --nav-bg: rgba(255, 255, 255, 0.92);
   --text-primary: #1e293b;
   --text-secondary: #64748b;
   
@@ -39,6 +40,7 @@
   /* Mode Sombre Premium (Nocturne et Profond) */
   --bg-color: #0b1120; /* Bleu-noir très profond */
   --surface-color: rgba(255, 255, 255, 0.03); /* Transparence pour Glassmorphism */
+  --nav-bg: rgba(15, 23, 42, 0.97); /* Fond opaque pour la navbar en mode sombre */
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   
@@ -338,6 +340,11 @@ button {
 @keyframes fadeInSlide {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skeleton-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .animate-fade-in {

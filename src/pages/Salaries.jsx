@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ListPageSkeleton } from '../components/SkeletonLoader';
 import { getSettings } from '../services/settings';
 import { getMonthlySalaries, updateMonthlySalaries } from '../services/salaries';
 import { auth } from '../config/firebase';
@@ -78,7 +79,7 @@ const Salaries = ({ householdId }) => {
     setCurrentDate(next);
   };
 
-  if (loading) return <div className="page-container" style={{ padding: '2rem' }}><p>Chargement des revenus...</p></div>;
+  if (loading) return <ListPageSkeleton rows={3} title={false} />;
 
   return (
     <div className="page-container animate-fade-in">

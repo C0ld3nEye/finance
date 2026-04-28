@@ -5,20 +5,21 @@
   left: 0;
   right: 0;
   height: 6rem;
-  background-color: var(--surface-color);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: var(--nav-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-glass);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 0 0.5rem 1rem 0.5rem; /* Espace pour la barre de l'iPhone bas */
+  padding: 0 0.5rem 1rem 0.5rem;
   z-index: 1000;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.05);
 }
 
 .dark-theme .bottom-nav {
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 @media (min-width: 601px) {

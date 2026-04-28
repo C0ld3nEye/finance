@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getExpensesByMonth, addExpense, deleteExpense, updateExpense } from '../services/expenses';
 import { getMonthlySalaries } from '../services/salaries';
 import { format, addMonths, subMonths } from 'date-fns';
@@ -15,7 +16,14 @@ import { CATEGORY_CONFIG, CATEGORIES, getCategoryConfig } from '../constants/cat
 import { calculateDistribution as calcDist } from '../utils/finance';
 
 const Expenses = ({ householdId }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [searchParams] = useSearchParams();
+  const initialDate = (() => {
+    const y = searchParams.get('year');
+    const m = searchParams.get('month');
+    if (y && m) return new Date(Number(y), Number(m), 1);
+    return new Date();
+  })();
+  const [currentDate, setCurrentDate] = useState(initialDate);
   const [expenses, setExpenses] = useState([]);
   const [settings, setSettings] = useState(null);
   const [monthlySalaries, setMonthlySalaries] = useState(null);

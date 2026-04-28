@@ -8,8 +8,9 @@ import { getAllSettlements } from '../services/settlements';
 import { auth } from '../config/firebase';
 import { PieChart as ChartIcon, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, User, Lock } from 'lucide-react';
 import { CategoryPieChart, MonthlyTrendChart } from '../components/AnalyticsCharts';
+import { DashboardSkeleton } from '../components/SkeletonLoader';
 import { getCategoryKey } from '../constants/categories';
-import { calculateDistribution } from '../utils/finance';
+import { calculateDistribution, getAnnualChargeProgress } from '../utils/finance';
 
 const Dashboard = ({ householdId }) => {
   const navigate = useNavigate();
@@ -89,6 +90,13 @@ const Dashboard = ({ householdId }) => {
       const tIncome = mSal?.salaries ? Object.values(mSal.salaries).reduce((a, b) => a + b, 0) : 0;
       const salairesSaisis = !!mSal?.salaries && Object.values(mSal.salaries).some(v => v > 0);
 
+      // Charges annuelles dont l'échéance est ce mois-ci ou le mois prochain
+      const upcomingAnnualCharges = currentHouseCharges.filter(c => {
+        if (c.frequency !== 'annual') return false;
+        const prog = getAnnualChargeProgress(c, currentYear, currentMonth);
+        return prog.isDueThisMonth || prog.monthsUntilDue === 1;
+      });
+
       // 3. Dette & Historique (Calcul différentiel)
       const membersArr = settingsData.members;
       // Utilise calculateDistribution centralisé (utils/finance.js)
@@ -100,7 +108,7 @@ const Dashboard = ({ householdId }) => {
       for (let i = 5; i >= 0; i--) {
         const d = new Date(currentYear, currentMonth - i, 1);
         const mStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-        trendMap[mStr] = { name: d.toLocaleDateString('fr-FR', { month: 'short' }), foyer: 0, perso: 0 };
+        trendMap[mStr] = { name: d.toLocaleDateString('fr-FR', { month: 'short' }), monthKey: mStr, foyer: 0, perso: 0 };
       }
 
       let totalArrears = 0; // Dette passée (Expenses uniquement)
@@ -214,6 +222,7 @@ const Dashboard = ({ householdId }) => {
         totalIncome: tIncome,
         salairesSaisis,
         remaining: salairesSaisis ? tIncome - tHouseCharges - tHouseExpenses : null,
+        upcomingAnnualCharges,
         myMonthlyHouseContribution,
         myPendingDebt: netDebt,
         myPendingArrears: remainingArrears,
@@ -228,7 +237,7 @@ const Dashboard = ({ householdId }) => {
     }
   };
 
-  if(loading) return <div className="page-container" style={{ padding: '2rem' }}><p>Chargement du dashboard...</p></div>;
+  if(loading) return <DashboardSkeleton />;
 
   return (
     <div className="page-container animate-fade-in">
@@ -341,7 +350,7 @@ const Dashboard = ({ householdId }) => {
         </div>
       </div>
 
-      {(data.remaining < 0 || data.myPendingArrears > 0 || !data.salairesSaisis || data.myPendingDebt > 100) && (
+      {(data.remaining < 0 || data.myPendingArrears > 0 || !data.salairesSaisis || data.myPendingDebt > 100 || data.upcomingAnnualCharges?.length > 0) && (
         <div className="card animate-fade-in">
           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>Points d'attention</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -369,6 +378,20 @@ const Dashboard = ({ householdId }) => {
                 <span>Vous avez {data.myPendingDebt.toFixed(2)} € à reverser au foyer ce mois-ci.</span>
               </div>
             )}
+            {data.upcomingAnnualCharges?.map(c => {
+              const prog = getAnnualChargeProgress(c, new Date().getFullYear(), new Date().getMonth());
+              return (
+                <div key={c.id} className={`alert-banner ${prog.isDueThisMonth ? 'alert-banner-danger' : 'alert-banner-warning'}`}>
+                  <span style={{ fontSize: '1rem' }}>{prog.isDueThisMonth ? '📅' : '⚡'}</span>
+                  <span>
+                    <strong>{c.name}</strong> — {prog.isDueThisMonth ? 'échéance ce mois !' : 'échéance le mois prochain'} ({c.annualAmount} €).{' '}
+                    Provision : {prog.provisioned.toFixed(0)} € / {prog.total.toFixed(0)} €
+                    {prog.remaining > 0 && <span style={{ color: prog.isDueThisMonth ? 'var(--danger)' : 'var(--warning)', fontWeight: '700' }}> — manque {prog.remaining.toFixed(2)} €</span>}
+                    {prog.remaining === 0 && <span style={{ color: 'var(--success)', fontWeight: '700' }}> ✓ Provision complète</span>}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

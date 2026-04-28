@@ -7,6 +7,7 @@ import { getAllSettlements, addSettlement, deleteSettlement } from '../services/
 import { auth } from '../config/firebase';
 import { ArrowUpDown, Landmark, User, CheckCircle2, Trash2, ChevronLeft, ChevronRight, History, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { calculateDistribution } from '../utils/finance';
+import { DebtsSkeleton } from '../components/SkeletonLoader';
 
 /* ── Composant accordéon avec logique FIFO ── */
 const DetailAccordion = ({ details, settlements, currentMonth }) => {
@@ -418,7 +419,7 @@ const Debts = ({ householdId }) => {
     setCurrentDate(next);
   };
 
-  if (loading) return <div className="page-container" style={{ padding: '2rem' }}>Chargement des dettes...</div>;
+  if (loading) return <DebtsSkeleton />;
 
   return (
     <div className="page-container animate-fade-in">

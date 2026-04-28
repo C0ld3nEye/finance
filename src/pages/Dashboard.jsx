@@ -6,8 +6,8 @@ import { getSettings } from '../services/settings';
 import { getAllMonthlySalaries } from '../services/salaries';
 import { getAllSettlements } from '../services/settlements';
 import { auth } from '../config/firebase';
-import { PieChart as ChartIcon, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, User, Lock } from 'lucide-react';
-import { CategoryPieChart, MonthlyTrendChart } from '../components/AnalyticsCharts';
+import { TrendingUp, TrendingDown, Wallet, ArrowRightLeft, User, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { CategoryPieChart, MonthlyTrendChart, BudgetGauge } from '../components/AnalyticsCharts';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 import { getCategoryKey } from '../constants/categories';
 import { calculateDistribution, getAnnualChargeProgress } from '../utils/finance';
@@ -15,6 +15,7 @@ import { calculateDistribution, getAnnualChargeProgress } from '../utils/finance
 const Dashboard = ({ householdId }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('foyer'); // 'foyer' | 'perso'
   const [settings, setSettings] = useState(null);
   const [monthlySalaries, setMonthlySalaries] = useState(null);
   const [data, setData] = useState({
@@ -239,153 +240,246 @@ const Dashboard = ({ householdId }) => {
 
   if(loading) return <DashboardSkeleton />;
 
+  const myRestAVivre = data.mySalary - data.myMonthlyHouseContribution - data.persoExpenses - data.persoCharges;
+  const totalBudget = data.totalIncome;
+  const totalSpent = data.houseCharges + data.houseExpenses;
+  const monthLabel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+  const memberName = settings?.members?.find(m => m.id === auth.currentUser?.uid)?.name || 'Moi';
+
+  // Prévision fin de mois : on extrapole les dépenses à date sur 30 jours
+  const dayOfMonth = new Date().getDate();
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const projectedSpend = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : totalSpent;
+  const projectedRemaining = data.salairesSaisis ? totalBudget - projectedSpend : null;
+
+  const hasAlerts = data.remaining < 0 || data.myPendingArrears > 0 || !data.salairesSaisis || data.myPendingDebt > 100 || data.upcomingAnnualCharges?.length > 0;
+
   return (
     <div className="page-container animate-fade-in">
-      <header className="page-header" style={{ marginBottom: '2rem' }}>
-        <h1 className="text-gradient" style={{ fontSize: '2.5rem', fontWeight: '800', letterSpacing: '-1px', marginBottom: '0.5rem' }}>Dashboard</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Aperçu de vos finances pour {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</p>
+
+      {/* ── Header ── */}
+      <header style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="text-gradient" style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.5px', marginBottom: '0.2rem' }}>Dashboard</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{monthLabel}</p>
+        </div>
+        {hasAlerts && (
+          <button onClick={() => document.getElementById('alerts-section').scrollIntoView({ behavior: 'smooth' })}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--danger-light)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.5rem 0.75rem', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem', fontWeight: '600' }}>
+            <AlertTriangle size={14} /> {(data.upcomingAnnualCharges?.length || 0) + (data.myPendingArrears > 0 ? 1 : 0) + (!data.salairesSaisis ? 1 : 0)} alerte(s)
+          </button>
+        )}
       </header>
-      
-      <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--primary)' }}>Budget du Foyer</h2>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
-        <div className="card" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 className="label" style={{ margin: 0 }}>Revenus Communs</h3>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <button onClick={() => navigate('/salaries')} className="btn-small">Détails</button>
-              <div className="icon-badge-primary"><Wallet size={20} /></div>
+
+      {/* ── Sélecteur de vue ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <button onClick={() => setView('foyer')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.25rem', borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s ease', background: view === 'foyer' ? 'var(--primary)' : 'var(--surface-color)', color: view === 'foyer' ? 'white' : 'var(--text-secondary)' }}>
+          <Wallet size={15} /> Foyer
+        </button>
+        <button onClick={() => setView('perso')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.25rem', borderRadius: 'var(--radius-lg)', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s ease', background: view === 'perso' ? '#6366f1' : 'var(--surface-color)', color: view === 'perso' ? 'white' : 'var(--text-secondary)' }}>
+          <User size={15} /> {memberName}
+        </button>
+      </div>
+
+      {/* ══════════════════════════════════════════════
+          VUE FOYER
+      ══════════════════════════════════════════════ */}
+      {view === 'foyer' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* Row 1 : Reste foyer + Prévision */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Reste foyer</span>
+              {data.remaining === null
+                ? <span className="error-text" style={{ fontSize: '0.85rem' }}>⚠ Saisissez les salaires du mois</span>
+                : <p className="value-large" style={{ color: data.remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{data.remaining.toFixed(2)} €</p>
+              }
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>sur {data.totalIncome.toFixed(0)} € de revenus</span>
+            </div>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Prévision fin de mois</span>
+              {projectedRemaining === null
+                ? <span className="error-text" style={{ fontSize: '0.85rem' }}>⚠ Salaires manquants</span>
+                : <p className="value-large" style={{ color: projectedRemaining >= 0 ? 'var(--warning)' : 'var(--danger)' }}>{projectedRemaining.toFixed(2)} €</p>
+              }
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>extrapolé sur {daysInMonth} jours (jour {dayOfMonth})</span>
             </div>
           </div>
-          <p className="value-large">{data.totalIncome.toFixed(2)} €</p>
-          {data.totalIncome === 0 && <span className="error-text">⚠ Non saisis</span>}
-        </div>
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 className="label" style={{ margin: 0 }}>Charges Foyer</h3>
-            <div className="icon-badge-warning"><ChartIcon size={20} /></div>
+          {/* Row 2 : Jauge budget + Détail */}
+          <div className="card">
+            <h3 className="label" style={{ marginBottom: '1rem' }}>Budget consommé ce mois</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <BudgetGauge spent={totalSpent} total={totalBudget} label="consommé" />
+              <div style={{ flex: 1, minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Charges</span>
+                    <span style={{ fontWeight: '600' }}>{data.houseCharges.toFixed(2)} €</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: totalBudget > 0 ? `${Math.min((data.houseCharges / totalBudget) * 100, 100)}%` : '0%', background: 'var(--primary)', borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Dépenses</span>
+                    <span style={{ fontWeight: '600' }}>{data.houseExpenses.toFixed(2)} €</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: totalBudget > 0 ? `${Math.min((data.houseExpenses / totalBudget) * 100, 100)}%` : '0%', background: '#a855f7', borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Total</span>
+                    <span style={{ fontWeight: '700' }}>{totalSpent.toFixed(2)} € / {totalBudget.toFixed(2)} €</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: totalBudget > 0 ? `${Math.min((totalSpent / totalBudget) * 100, 100)}%` : '0%', background: 'var(--success)', borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="value-large" style={{ color: 'var(--warning)' }}>{data.houseCharges.toFixed(2)} €</p>
-        </div>
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 className="label" style={{ margin: 0 }}>Dépenses Foyer</h3>
-            <div className="icon-badge-danger"><TrendingDown size={20} /></div>
+          {/* Row 3 : Donut catégories */}
+          <div className="card">
+            <h3 className="label" style={{ marginBottom: '1rem' }}>Répartition par catégorie</h3>
+            <CategoryPieChart data={data.categoryData || {}} />
           </div>
-          <p className="value-large" style={{ color: 'var(--danger)' }}>{data.houseExpenses.toFixed(2)} €</p>
-        </div>
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 className="label" style={{ margin: 0 }}>Reste Foyer</h3>
-            <div className="icon-badge-success"><TrendingUp size={20} /></div>
+          {/* Row 4 : Comparatif mois */}
+          <div className="card">
+            <h3 className="label" style={{ marginBottom: '0.5rem' }}>Foyer vs Perso — 6 derniers mois</h3>
+            <MonthlyTrendChart data={data.trendData || []} />
           </div>
-          {data.remaining === null ? (
-            <span className="error-text">⚠ Saisissez les salaires du mois pour calculer le reste</span>
-          ) : (
-            <p className="value-large" style={{ color: data.remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{data.remaining.toFixed(2)} €</p>
-          )}
-        </div>
-      </div>
 
-      <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#6366f1' }}>Mes Finances Perso</h2>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 className="label" style={{ margin: 0 }}>Mon Salaire</h3>
-            <div className="icon-badge-indigo"><User size={20} /></div>
-          </div>
-          <p className="value-large" style={{ color: '#6366f1' }}>{data.mySalary.toFixed(2)} €</p>
         </div>
+      )}
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 className="label" style={{ margin: 0 }}>Ma Part du Foyer (Mois)</h3>
-            <div className="icon-badge-purple"><ChartIcon size={20} /></div>
-          </div>
-          <p className="value-large" style={{ color: '#a855f7' }}>{data.myMonthlyHouseContribution.toFixed(2)} €</p>
-          <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Votre quote-part des charges communes</span>
-        </div>
+      {/* ══════════════════════════════════════════════
+          VUE PERSO
+      ══════════════════════════════════════════════ */}
+      {view === 'perso' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 className="label" style={{ margin: 0 }}>Balance Foyer</h3>
-            <button onClick={() => navigate('/debts')} className="btn-small">Régler</button>
+          {/* Balance — widget principal mis en avant */}
+          <div className="card" style={{ borderLeft: `4px solid ${data.myPendingDebt > 0 ? 'var(--warning)' : data.myPendingDebt < 0 ? 'var(--success)' : 'var(--primary)'}`, borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <span className="label">Ma balance foyer</span>
+              <button onClick={() => navigate('/debts')} className="btn-small">Régler →</button>
+            </div>
+            <p style={{ fontSize: '2.5rem', fontWeight: '800', letterSpacing: '-1px', color: data.myPendingDebt > 0 ? 'var(--warning)' : data.myPendingDebt < 0 ? 'var(--success)' : 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+              {data.myPendingDebt > 0 ? '−' : data.myPendingDebt < 0 ? '+' : ''}{Math.abs(data.myPendingDebt).toFixed(2)} €
+            </p>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              {data.myPendingDebt > 0 ? 'Vous devez reverser au foyer' : data.myPendingDebt < 0 ? 'Le foyer vous doit de l\'argent' : 'Tout est à jour !'}
+            </p>
+            {data.myPendingArrears > 0 && (
+              <div className="alert-banner alert-banner-danger" style={{ marginTop: '0.75rem' }}>
+                <TrendingDown size={14} />
+                <span style={{ fontSize: '0.82rem' }}>Dont {data.myPendingArrears.toFixed(2)} € d'arriérés non soldés</span>
+              </div>
+            )}
           </div>
-          <p className="value-large" style={{ color: data.myPendingDebt > 0 ? 'var(--warning)' : data.myPendingDebt < 0 ? 'var(--success)' : 'var(--text-secondary)' }}>
-            {data.myPendingDebt > 0 ? '−' : data.myPendingDebt < 0 ? '+' : ''}{Math.abs(data.myPendingDebt).toFixed(2)} €
-          </p>
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            {data.myPendingDebt > 0 ? 'Vous devez reverser au foyer' : data.myPendingDebt < 0 ? 'Le foyer vous doit' : 'Tout est à jour !'}
-          </span>
-          {data.myPendingArrears > 0 && (
-            <span style={{ fontSize: '0.82rem', color: 'var(--danger)', fontWeight: '600' }}>
-              Dont {data.myPendingArrears.toFixed(2)} € d'arriérés
-            </span>
-          )}
-        </div>
-        
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 className="label" style={{ margin: 0 }}>Mon Reste à Vivre</h3>
-            <div className="icon-badge-sky"><TrendingUp size={20} /></div>
-          </div>
-          <p className="value-large" style={{ color: '#0ea5e9' }}>
-            {(data.mySalary - data.myMonthlyHouseContribution - data.persoExpenses - data.persoCharges).toFixed(2)} €
-          </p>
-          <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Après retrait de vos parts de ce mois</span>
-        </div>
-      </div>
-      
-      <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-primary)' }}>Analyse des Dépenses</h2>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
-        <div className="card">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>Répartition du foyer (ce mois)</h3>
-          <CategoryPieChart data={data.categoryData || {}} />
-        </div>
-        <div className="card">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>Évolution sur 6 mois (Total)</h3>
-          <MonthlyTrendChart data={data.trendData || []} />
-        </div>
-      </div>
 
-      {(data.remaining < 0 || data.myPendingArrears > 0 || !data.salairesSaisis || data.myPendingDebt > 100 || data.upcomingAnnualCharges?.length > 0) && (
-        <div className="card animate-fade-in">
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>Points d'attention</h2>
+          {/* Row : Salaire + Reste à vivre */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Mon salaire</span>
+              <p className="value-large" style={{ color: '#6366f1' }}>{data.mySalary.toFixed(2)} €</p>
+              {data.mySalary === 0 && <span className="error-text" style={{ fontSize: '0.8rem' }}>⚠ Non saisi ce mois</span>}
+            </div>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Mon reste à vivre</span>
+              <p className="value-large" style={{ color: myRestAVivre >= 0 ? 'var(--success)' : 'var(--danger)' }}>{myRestAVivre.toFixed(2)} €</p>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>après toutes mes parts</span>
+            </div>
+          </div>
+
+          {/* Row : Ma part foyer + Mes dépenses perso */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Ma part du foyer</span>
+              <p className="value-large" style={{ color: '#a855f7' }}>{data.myMonthlyHouseContribution.toFixed(2)} €</p>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>quote-part charges + dépenses communes</span>
+            </div>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <span className="label">Mes dépenses perso</span>
+              <p className="value-large" style={{ color: 'var(--danger)' }}>{(data.persoExpenses + data.persoCharges).toFixed(2)} €</p>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{data.persoExpenses.toFixed(0)} € dépenses + {data.persoCharges.toFixed(0)} € charges</span>
+            </div>
+          </div>
+
+          {/* Jauge perso */}
+          <div className="card">
+            <h3 className="label" style={{ marginBottom: '1rem' }}>Mon budget consommé</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <BudgetGauge spent={data.myMonthlyHouseContribution + data.persoExpenses + data.persoCharges} total={data.mySalary} label="de mon salaire" />
+              <div style={{ flex: 1, minWidth: '160px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {[
+                  { label: 'Part foyer', val: data.myMonthlyHouseContribution, color: '#6366f1' },
+                  { label: 'Dépenses perso', val: data.persoExpenses, color: '#a855f7' },
+                  { label: 'Charges perso', val: data.persoCharges, color: 'var(--warning)' },
+                ].map(({ label, val, color }) => (
+                  <div key={label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                      <span style={{ fontWeight: '600' }}>{val.toFixed(2)} €</span>
+                    </div>
+                    <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: data.mySalary > 0 ? `${Math.min((val / data.mySalary) * 100, 100)}%` : '0%', background: color, borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── Alertes (communes aux deux vues) ── */}
+      {hasAlerts && (
+        <div id="alerts-section" className="card animate-fade-in" style={{ marginTop: '1.5rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={16} style={{ color: 'var(--warning)' }} /> Points d'attention
+          </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {!data.salairesSaisis && (
               <div className="alert-banner alert-banner-info">
                 <span style={{ fontSize: '1rem' }}>💡</span>
-                <span>Les salaires de ce mois ne sont pas encore saisis — le reste foyer ne peut pas être calculé. <button onClick={() => navigate('/salaries')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Saisir</button></span>
+                <span>Salaires du mois non saisis — les calculs sont incomplets. <button onClick={() => navigate('/salaries')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Saisir</button></span>
               </div>
             )}
             {data.remaining !== null && data.remaining < 0 && (
               <div className="alert-banner alert-banner-danger">
-                <span style={{ fontSize: '1rem' }}>⚠️</span>
+                <span>⚠️</span>
                 <span style={{ color: 'var(--danger)', fontWeight: '600' }}>Budget foyer dépassé de {Math.abs(data.remaining).toFixed(2)} € ce mois-ci.</span>
               </div>
             )}
             {data.myPendingArrears > 0 && (
               <div className="alert-banner alert-banner-danger">
-                <span style={{ fontSize: '1rem' }}>🔴</span>
-                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{data.myPendingArrears.toFixed(2)} € d'arriérés non soldés sur des mois précédents. <button onClick={() => navigate('/debts')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Voir</button></span>
+                <span>🔴</span>
+                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{data.myPendingArrears.toFixed(2)} € d'arriérés non soldés. <button onClick={() => navigate('/debts')} className="btn-small" style={{ marginLeft: '0.5rem' }}>Voir</button></span>
               </div>
             )}
             {data.myPendingDebt > 100 && data.myPendingArrears === 0 && (
               <div className="alert-banner alert-banner-warning">
-                <span style={{ fontSize: '1rem' }}>🟡</span>
-                <span>Vous avez {data.myPendingDebt.toFixed(2)} € à reverser au foyer ce mois-ci.</span>
+                <span>🟡</span>
+                <span>{data.myPendingDebt.toFixed(2)} € à reverser au foyer ce mois-ci.</span>
               </div>
             )}
             {data.upcomingAnnualCharges?.map(c => {
               const prog = getAnnualChargeProgress(c, new Date().getFullYear(), new Date().getMonth());
               return (
                 <div key={c.id} className={`alert-banner ${prog.isDueThisMonth ? 'alert-banner-danger' : 'alert-banner-warning'}`}>
-                  <span style={{ fontSize: '1rem' }}>{prog.isDueThisMonth ? '📅' : '⚡'}</span>
+                  <span>{prog.isDueThisMonth ? '📅' : '⚡'}</span>
                   <span>
                     <strong>{c.name}</strong> — {prog.isDueThisMonth ? 'échéance ce mois !' : 'échéance le mois prochain'} ({c.annualAmount} €).{' '}
-                    Provision : {prog.provisioned.toFixed(0)} € / {prog.total.toFixed(0)} €
+                    Provision : {prog.provisioned.toFixed(0)} / {prog.total.toFixed(0)} €
                     {prog.remaining > 0 && <span style={{ color: prog.isDueThisMonth ? 'var(--danger)' : 'var(--warning)', fontWeight: '700' }}> — manque {prog.remaining.toFixed(2)} €</span>}
                     {prog.remaining === 0 && <span style={{ color: 'var(--success)', fontWeight: '700' }}> ✓ Provision complète</span>}
                   </span>
@@ -395,7 +489,8 @@ const Dashboard = ({ householdId }) => {
           </div>
         </div>
       )}
-      </div>
+
+    </div>
   );
 };
 

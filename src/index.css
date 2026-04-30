@@ -168,15 +168,22 @@ button {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(7, 16, 13, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: rgba(7, 16, 13, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  padding: 1rem;
-  animation: fadeInOverlay 0.22s ease-out forwards;
+  padding: 1.5rem;
+  animation: fadeInOverlay 0.25s ease-out forwards;
+}
+
+@media (max-width: 600px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end; /* Style tiroir / bottom sheet */
+  }
 }
 @keyframes fadeInOverlay {
   from { opacity: 0; }
@@ -185,41 +192,58 @@ button {
 
 .modal-content {
   width: 100%;
-  max-width: 600px;
-  max-height: 85vh;
+  max-width: 580px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background-color: var(--surface-solid);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-solid);
-  padding: 0;
   position: relative;
-  animation: modalScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.modal-content > .modal-header {
-  padding: 1.5rem 1.75rem 1rem;
+@media (max-width: 600px) {
+  .modal-content {
+    max-height: 92dvh; /* Utilise la hauteur dynamique du viewport */
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0; /* Arrondis seulement en haut */
+    animation: modalSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.modal-content .modal-header {
+  padding: 1.5rem;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-solid);
+  background-color: var(--surface-solid);
+  z-index: 10;
 }
-.modal-content > .modal-body {
-  padding: 1.25rem 1.75rem;
+.modal-content .modal-body {
+  padding: 1.5rem;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
-.modal-content > .modal-footer {
-  padding: 1rem 1.75rem 1.5rem;
+.modal-content .modal-footer {
+  padding: 1.5rem;
   flex-shrink: 0;
   border-top: 1px solid var(--border-solid);
-  background-color: var(--surface-solid);
+  background-color: var(--bg-subtle);
+  z-index: 10;
 }
-.modal-content > form {
+.modal-content form {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   flex: 1;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -446,4 +470,20 @@ button {
 
 .animate-fade-in {
   animation: fadeInSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Utilitaires Layout */
+.flex-col-1 {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.w-full {
+  width: 100%;
 }

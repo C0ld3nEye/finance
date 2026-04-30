@@ -39,16 +39,17 @@ const DistributionPreview = ({ amount, type, customPct, customAmts, settings, ca
   );
 };
 
-const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, calcDist2 }) => {
+const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, calcDist2, isModal = false }) => {
   const availAcc = settings?.accounts?.filter(a => a.visibility === 'shared' || a.ownerId === uid) || [];
-  return (
-    <div className="card animate-fade-in" style={{ marginBottom: '1.25rem', border: '1.5px solid var(--primary)', padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border-solid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-subtle)' }}>
-        <h3 style={{ fontWeight: '700', fontSize: '0.95rem', margin: 0 }}>{title}</h3>
-        <button onClick={onCancel} style={{ color: 'var(--text-muted)', padding: '0.25rem' }}><X size={18} /></button>
+  
+  const formContent = (
+    <div className={isModal ? "flex-col-1 overflow-hidden" : ""}>
+      <div className={isModal ? "modal-header" : ""} style={!isModal ? { padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-solid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-subtle)' } : {}}>
+        <h3 style={{ fontWeight: '700', fontSize: '1.1rem', margin: 0 }}>{title}</h3>
+        <button type="button" onClick={onCancel} style={{ color: 'var(--text-muted)', padding: '0.5rem' }}><X size={22} /></button>
       </div>
       <form onSubmit={onSubmit}>
-        <div style={{ padding: '1.1rem 1.25rem', display: 'grid', gap: '0.875rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <div className={isModal ? "modal-body" : ""} style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', padding: !isModal ? '1.5rem' : undefined }}>
           <div>
             <label className="label">Nom</label>
             <input className="input-field" required placeholder="ex: Loyer, Netflix…" value={data.name} onChange={e => setData(p => ({ ...p, name: e.target.value }))} />
@@ -112,7 +113,7 @@ const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, c
                   const pct = {}; const amt = {};
                   settings.members.forEach(m => { pct[m.id] = m.id === uid ? 100 : 0; amt[m.id] = m.id === uid ? Number(data.amount) : 0; });
                   setData(p => ({ ...p, distributionType: 'custom', customPercentages: pct, customAmounts: amt }));
-                }}>Tout pour moi</button>
+                }}>Tout moi</button>
               <button type="button" className="btn-small" style={{ flex: 1 }}
                 onClick={() => {
                   const other = settings.members.find(m => m.id !== uid);
@@ -120,7 +121,7 @@ const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, c
                   const pct = {}; const amt = {};
                   settings.members.forEach(m => { pct[m.id] = m.id === other.id ? 100 : 0; amt[m.id] = m.id === other.id ? Number(data.amount) : 0; });
                   setData(p => ({ ...p, distributionType: 'custom', customPercentages: pct, customAmounts: amt }));
-                }}>Tout pour l'autre</button>
+                }}>Tout l'autre</button>
             </div>
           </div>
           <div>
@@ -170,11 +171,19 @@ const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, c
             <DistributionPreview amount={data.amount} type={data.distributionType} customPct={data.customPercentages} customAmts={data.customAmounts} settings={settings} calcDist2={calcDist2} />
           </div>
         </div>
-        <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--border-solid)', background: 'var(--bg-subtle)', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-          <button type="button" onClick={onCancel} className="btn" style={{ border: '1px solid var(--border-solid)', color: 'var(--text-secondary)' }}>Annuler</button>
-          <button type="submit" className="btn btn-primary">Enregistrer</button>
+        <div className={isModal ? "modal-footer" : ""} style={!isModal ? { padding: '1.25rem', borderTop: '1px solid var(--border-solid)', background: 'var(--bg-subtle)', display: 'flex', justifyContent: 'flex-end', gap: '0.8rem' } : { display: 'flex', justifyContent: 'flex-end', gap: '0.8rem' }}>
+          <button type="button" onClick={onCancel} className="btn" style={{ border: '1px solid var(--border-solid)', color: 'var(--text-secondary)', background: 'transparent', minWidth: '100px' }}>Annuler</button>
+          <button type="submit" className="btn btn-primary" style={{ minWidth: '120px' }}>Enregistrer</button>
         </div>
       </form>
+    </div>
+  );
+
+  if (isModal) return formContent;
+
+  return (
+    <div className="card animate-fade-in" style={{ marginBottom: '1.5rem', border: '2px solid var(--primary)', padding: 0, overflow: 'hidden' }}>
+      {formContent}
     </div>
   );
 };
@@ -423,12 +432,13 @@ const Charges = ({ householdId }) => {
       {/* Modal modification */}
       {editingCharge && (
         <div className="modal-overlay" onClick={() => setEditingCharge(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: 0 }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <ChargeForm
               data={editingCharge} setData={setEditingCharge}
               onSubmit={handleUpdate} onCancel={() => setEditingCharge(null)}
               title="Modifier la charge"
               settings={settings} uid={uid} calcDist2={calcDist2}
+              isModal={true}
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { Wallet, LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -24,86 +24,138 @@ const Login = () => {
   };
 
   return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #4f46e5 0%, #818cf8 100%)',
-      padding: '1rem'
+      background: 'var(--bg-color)',
+      padding: '1.5rem',
+      position: 'relative',
+      overflow: 'hidden',
     }}>
-      <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ 
-            width: '60px', 
-            height: '60px', 
-            backgroundColor: 'var(--primary)', 
-            borderRadius: 'var(--radius-lg)', 
-            display: 'inline-flex', 
-            alignItems: 'center', 
+
+      {/* Orbes de fond */}
+      <div style={{
+        position: 'absolute', top: '-20%', left: '-10%',
+        width: '500px', height: '500px', borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(13,159,110,0.12) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-15%', right: '-10%',
+        width: '400px', height: '400px', borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div className="animate-fade-in" style={{
+        width: '100%',
+        maxWidth: '380px',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+
+        {/* Logo / Brand */}
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+          <div style={{
+            width: '56px', height: '56px',
+            background: 'var(--primary-gradient)',
+            borderRadius: '16px',
+            display: 'inline-flex',
+            alignItems: 'center',
             justifyContent: 'center',
-            color: 'white',
-            marginBottom: '1rem',
-            boxShadow: '0 8px 16px rgba(79, 70, 229, 0.3)'
+            marginBottom: '1.25rem',
+            boxShadow: '0 8px 24px rgba(13, 159, 110, 0.3)',
           }}>
-            <Wallet size={32} />
+            {/* Icône maison stylisée */}
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', letterSpacing: '-0.5px' }}>Finance Famille</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Connectez-vous à votre espace foyer</p>
+          <h1 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '2rem',
+            fontWeight: '400',
+            letterSpacing: '-0.3px',
+            color: 'var(--text-primary)',
+            marginBottom: '0.4rem',
+            lineHeight: 1.2,
+          }}>
+            Finance Famille
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: '500' }}>
+            Votre espace de gestion foyer
+          </p>
         </div>
 
-        {error && (
-          <div style={{ 
-            backgroundColor: '#fee2e2', 
-            color: 'var(--danger)', 
-            padding: '0.75rem 1rem', 
-            borderRadius: 'var(--radius-md)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            marginBottom: '1.5rem',
-            border: '1px solid #fecaca'
-          }}>
-            <AlertCircle size={18} /> {error}
-          </div>
-        )}
+        {/* Card formulaire */}
+        <div className="card" style={{ padding: '2rem' }}>
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label className="label">Adresse Email</label>
-            <input 
-              type="email" 
-              className="input-field" 
-              placeholder="votre@email.com" 
-              required 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">Mot de passe</label>
-            <input 
-              type="password" 
-              className="input-field" 
-              placeholder="••••••••" 
-              required 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: '100%', marginTop: '0.5rem', height: '3rem' }}
-            disabled={loading}
-          >
-            {loading ? 'Connexion...' : <><LogIn size={18} /> Se connecter</>}
-          </button>
-        </form>
+          {error && (
+            <div style={{
+              backgroundColor: 'var(--danger-light)',
+              color: 'var(--danger)',
+              padding: '0.75rem 1rem',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              marginBottom: '1.25rem',
+              border: '1px solid rgba(220, 38, 38, 0.15)',
+            }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} /> {error}
+            </div>
+          )}
 
-        <p style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-          Ceci est une application privée de gestion de foyer.
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <div>
+              <label className="label">Adresse e-mail</label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="vous@exemple.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Mot de passe</label>
+              <input
+                type="password"
+                className="input-field"
+                placeholder="••••••••"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '0.5rem', height: '2.9rem', fontSize: '0.95rem' }}
+              disabled={loading}
+            >
+              {loading
+                ? <span style={{ opacity: 0.8 }}>Connexion…</span>
+                : <><LogIn size={17} /> Se connecter</>
+              }
+            </button>
+          </form>
+        </div>
+
+        <p style={{
+          textAlign: 'center',
+          marginTop: '1.5rem',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)',
+          fontWeight: '500',
+        }}>
+          Application privée · Accès restreint
         </p>
       </div>
     </div>

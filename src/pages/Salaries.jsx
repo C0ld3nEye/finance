@@ -3,6 +3,7 @@ import { ListPageSkeleton } from '../components/SkeletonLoader';
 import { getSettings } from '../services/settings';
 import { getMonthlySalaries, updateMonthlySalaries } from '../services/salaries';
 import { auth } from '../config/firebase';
+import { formatAccountingMonthLabel } from '../utils/monthUtils';
 import { Wallet, Check, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 
@@ -57,7 +58,7 @@ const Salaries = ({ householdId }) => {
       await updateMonthlySalaries(householdId, year, month, salaries);
       await alert({ 
         title: 'Sauvegarde réussie', 
-        message: 'Vos revenus ont été enregistrés avec succès pour ' + currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+        message: 'Vos revenus ont été enregistrés avec succès pour ' + formatAccountingMonthLabel(year, month, settings?.accountStartDay || 1),
         variant: 'success',
         icon: 'save'
       });
@@ -98,7 +99,7 @@ const Salaries = ({ householdId }) => {
           <ChevronLeft size={24} />
         </button>
         <h2 className="month-nav-title">
-          {currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          {formatAccountingMonthLabel(currentDate.getFullYear(), currentDate.getMonth(), settings?.accountStartDay || 1).replace(/^\w/, c => c.toUpperCase())}
         </h2>
         <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(1)}>
           <ChevronRight size={24} />

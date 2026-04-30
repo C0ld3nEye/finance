@@ -10,6 +10,8 @@ import Charges from './pages/Charges';
 import Salaries from './pages/Salaries';
 import Debts from './pages/Debts';
 import Settings from './pages/Settings';
+import Savings from './pages/Savings';
+import Projects from './pages/Projects';
 import Login from './pages/Login';
 import { ConfirmProvider } from './context/ConfirmContext';
 import './index.css';
@@ -19,7 +21,6 @@ function App() {
   const [householdId, setHouseholdId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Thème dynamique Nuit / Jour (Nuit: 19h - 07h)
   useEffect(() => {
     const checkTheme = () => {
       const hour = new Date().getHours();
@@ -30,7 +31,7 @@ function App() {
       }
     };
     checkTheme();
-    const interval = setInterval(checkTheme, 60000); // Vérifie chaque minute
+    const interval = setInterval(checkTheme, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -39,9 +40,7 @@ function App() {
       setUser(currentUser);
       if (currentUser) {
         const profile = await getUserProfile(currentUser.uid);
-        if (profile?.householdId) {
-          setHouseholdId(profile.householdId);
-        }
+        if (profile?.householdId) setHouseholdId(profile.householdId);
       } else {
         setHouseholdId(null);
       }
@@ -51,12 +50,9 @@ function App() {
   }, []);
 
   if (loading) {
-// ...
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)' }}>
-        <div style={{ textAlign: 'center' }}>
-           <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>Chargement sécurisé...</p>
-        </div>
+        <p style={{ color: 'var(--text-secondary)' }}>Chargement sécurisé...</p>
       </div>
     );
   }
@@ -71,6 +67,7 @@ function App() {
       </Router>
     );
   }
+
   return (
     <ConfirmProvider>
       <Router>
@@ -91,6 +88,8 @@ function App() {
                   <Route path="/charges" element={<Charges householdId={householdId} />} />
                   <Route path="/salaries" element={<Salaries householdId={householdId} />} />
                   <Route path="/debts" element={<Debts householdId={householdId} />} />
+                  <Route path="/savings" element={<Savings householdId={householdId} />} />
+                  <Route path="/projects" element={<Projects householdId={householdId} />} />
                   <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </>

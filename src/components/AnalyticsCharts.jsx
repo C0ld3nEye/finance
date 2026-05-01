@@ -5,6 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { getCategoryConfig } from '../constants/categories';
+import { formatEuro } from '../utils/finance';
 
 const getCategoryColor = (name) => getCategoryConfig(name).color;
 
@@ -26,7 +27,7 @@ const ThemedTooltip = ({ active, payload, label }) => {
       {label && <p style={{ fontWeight: '700', marginBottom: '0.4rem', color: dark ? '#94a3b8' : '#64748b' }}>{label}</p>}
       {payload.map((entry, i) => (
         <p key={i} style={{ color: entry.color || entry.fill, fontWeight: '600', margin: '0.1rem 0' }}>
-          {entry.name} : {Number(entry.value).toFixed(2)} €
+          {entry.name} : {formatEuro(entry.value)}
         </p>
       ))}
     </div>
@@ -46,7 +47,7 @@ const PieTooltip = ({ active, payload }) => {
     }}>
       <p style={{ fontWeight: '700', marginBottom: '0.25rem' }}>{payload[0].name}</p>
       <p style={{ color: payload[0].payload.fill || 'var(--primary)', fontWeight: '600' }}>
-        {Number(payload[0].value).toFixed(2)} €
+        {formatEuro(payload[0].value)}
       </p>
     </div>
   );
@@ -84,7 +85,7 @@ export const CategoryPieChart = ({ data }) => {
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: e.fill, flexShrink: 0 }} />
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flex: 1 }}>{e.name}</span>
-            <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>{e.value.toFixed(0)} €</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-primary)' }}>{formatEuro(e.value, false)}</span>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', minWidth: '34px', textAlign: 'right' }}>{((e.value / total) * 100).toFixed(0)} %</span>
           </div>
         ))}
@@ -112,7 +113,7 @@ export const BudgetGauge = ({ spent, total, label = 'utilisé' }) => {
         />
         <text x="65" y="58" textAnchor="middle" fontSize="20" fontWeight="600" fill="var(--text-primary)">{pct.toFixed(0)}%</text>
         <text x="65" y="74" textAnchor="middle" fontSize="11" fill="var(--text-secondary)">{label}</text>
-        <text x="65" y="89" textAnchor="middle" fontSize="10" fill="var(--text-secondary)">{spent.toFixed(0)} / {total.toFixed(0)} €</text>
+        <text x="65" y="89" textAnchor="middle" fontSize="10" fill="var(--text-secondary)">{formatEuro(spent, false)} / {formatEuro(total, false)}</text>
       </svg>
     </div>
   );

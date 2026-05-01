@@ -17,6 +17,38 @@ const block = (h, w = '100%', mb = '0') => ({
 
 /* ─── Variantes ──────────────────────────────────────────────── */
 
+export const GlobalSkeleton = () => (
+  <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%', maxWidth: '200px' }}>
+      <span style={{ ...block('48px', '48px'), borderRadius: '50%' }} />
+      <span style={block('12px', '60%')} />
+      <span style={block('8px', '40%')} />
+    </div>
+  </div>
+);
+
+export const SettingsSkeleton = () => (
+  <div className="page-container" style={{ padding: '2rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+      <div style={{ width: '100%' }}>
+        <span style={block('2.5rem', '50%', '0.5rem')} />
+        <span style={block('1rem', '30%')} />
+      </div>
+    </div>
+    
+    {[1, 2, 3].map(i => (
+      <div key={i} className="card" style={{ marginBottom: '1.25rem', padding: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <span style={{ ...block('24px', '24px'), borderRadius: '50%' }} />
+          <span style={block('1.2rem', '40%')} />
+        </div>
+        <span style={block('0.9rem', '80%', '1.5rem')} />
+        <span style={block('3rem', '100%', '0.5rem')} />
+      </div>
+    ))}
+  </div>
+);
+
 export const DashboardSkeleton = () => (
   <div className="page-container" style={{ padding: '2rem' }}>
     {/* Titre */}

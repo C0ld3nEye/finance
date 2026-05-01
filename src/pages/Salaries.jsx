@@ -6,6 +6,7 @@ import { auth } from '../config/firebase';
 import { formatAccountingMonthLabel } from '../utils/monthUtils';
 import { Wallet, Check, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { formatEuro } from '../utils/finance';
 
 const Salaries = ({ householdId }) => {
   const [loading, setLoading] = useState(true);
@@ -84,38 +85,38 @@ const Salaries = ({ householdId }) => {
 
   return (
     <div className="page-container animate-fade-in">
-      <header className="page-header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '700' }}>Revenus Mensuels</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Ajustez vos salaires pour chaque mois</p>
+          <h1 style={{ fontSize: '2.25rem', fontWeight: '800', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>Revenus</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Ajustez vos salaires pour chaque mois</p>
         </div>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          <Check size={18} /> {saving ? 'Enregistrement...' : 'Enregistrer'}
+        <button className="btn btn-primary" style={{ padding: '0.8rem 1.25rem' }} onClick={handleSave} disabled={saving}>
+          <Check size={18} /> {saving ? '...' : 'Enregistrer'}
         </button>
       </header>
 
       <div className="month-nav">
-        <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(-1)}>
+        <button className="btn" style={{ padding: '0.5rem', color: 'var(--primary)' }} onClick={() => changeMonth(-1)}>
           <ChevronLeft size={24} />
         </button>
         <h2 className="month-nav-title">
           {formatAccountingMonthLabel(currentDate.getFullYear(), currentDate.getMonth(), settings?.accountStartDay || 1).replace(/^\w/, c => c.toUpperCase())}
         </h2>
-        <button className="btn btn-outline" style={{ padding: '0.5rem', border: 'none' }} onClick={() => changeMonth(1)}>
+        <button className="btn" style={{ padding: '0.5rem', color: 'var(--primary)' }} onClick={() => changeMonth(1)}>
           <ChevronRight size={24} />
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
         {settings?.members?.map(m => (
-          <div key={m.id} className="card animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'var(--bg-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: '700' }}>
+          <div key={m.id} className="card animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="avatar" style={{ borderRadius: '12px', width: '44px', height: '44px' }}>
                 {m.name.charAt(0)}
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>{m.name}</h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Revenu net avant impôts</span>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '700' }}>{m.name}</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenu net mensuel</span>
               </div>
             </div>
             
@@ -123,57 +124,60 @@ const Salaries = ({ householdId }) => {
               <input 
                 type="number" 
                 className="input-field" 
-                style={{ fontSize: '1.5rem', fontWeight: '700', paddingRight: '2.5rem' }}
+                style={{ fontSize: '1.75rem', fontWeight: '800', paddingRight: '2.5rem', height: '60px' }}
                 value={salaries[m.id] || ''} 
                 onChange={e => setSalaries({ ...salaries, [m.id]: Number(e.target.value) })}
-                placeholder="0.00"
+                placeholder="0"
               />
-              <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: '700', color: 'var(--text-secondary)' }}>€</span>
+              <span style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-muted)', fontSize: '1.25rem' }}>€</span>
             </div>
 
             {totalSalary > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
-                <div style={{ flex: 1, height: '6px', backgroundColor: 'var(--bg-color)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Part du foyer</span>
+                  <span style={{ fontWeight: '800', color: 'var(--primary)' }}>{((salaries[m.id] / totalSalary) * 100).toFixed(1)}%</span>
+                </div>
+                <div style={{ height: '8px', backgroundColor: 'var(--bg-subtle)', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-solid)' }}>
                   <div style={{ 
                     height: '100%', 
                     width: `${(salaries[m.id] / totalSalary) * 100}%`, 
-                    backgroundColor: 'var(--primary)',
-                    transition: 'width 0.3s ease'
+                    background: 'var(--primary-gradient)',
+                    transition: 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}></div>
                 </div>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', minWidth: '45px' }}>
-                  {((salaries[m.id] / totalSalary) * 100).toFixed(1)}%
-                </span>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ marginTop: '2rem', backgroundColor: '#f0fdf4', border: '1px solid #bbfcce', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem', backgroundColor: '#dcfce7', borderRadius: '50%', color: '#166534' }}>
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#166534' }}>Total Foyer</h3>
-            <p style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)' }}>
-              {totalSalary.toFixed(2)} €
-            </p>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          {settings?.members?.map(m => (
-            <div key={m.id} style={{ textAlign: 'center' }}>
-               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>{m.name}</div>
-               <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)' }}>
-                 {totalSalary > 0 
-                  ? ((salaries[m.id] / totalSalary) * 100).toFixed(1)
-                  : 0}%
-               </div>
+      <div className="card animate-fade-in" style={{ marginTop: '2.5rem', border: '1px solid var(--primary-light)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+            <div className="icon-badge icon-badge-primary" style={{ padding: '0.85rem', borderRadius: '1rem' }}>
+              <TrendingUp size={28} />
             </div>
-          ))}
+            <div>
+              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Revenu total du foyer</p>
+              <h3 className="value-large" style={{ color: 'var(--primary)' }}>
+                {formatEuro(totalSalary)}
+              </h3>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '1.5rem', background: 'var(--bg-subtle)', padding: '0.75rem 1.25rem', borderRadius: 'var(--radius-md)' }}>
+            {settings?.members?.map(m => (
+              <div key={m.id} style={{ textAlign: 'center' }}>
+                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '0.1rem' }}>{m.name}</div>
+                 <div style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)' }}>
+                   {totalSalary > 0 
+                    ? ((salaries[m.id] / totalSalary) * 100).toFixed(0)
+                    : 0}%
+                 </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

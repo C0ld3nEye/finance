@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { calculateHouseholdDebts } from '../utils/debtUtils';
 import { DebtsSkeleton } from '../components/SkeletonLoader';
+import { formatEuro } from '../utils/finance';
 
 /* ── Accordéon détail ── */
 const DetailAccordion = ({ details, mySettlements, currentMonthKey }) => {
@@ -42,7 +43,7 @@ const DetailAccordion = ({ details, mySettlements, currentMonthKey }) => {
         <div key={month} style={{ marginBottom: '0.75rem' }}>
           <div style={{ fontWeight: '700', color: isPast ? 'var(--danger)' : 'var(--primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem', marginBottom: '0.35rem', display: 'flex', justifyContent: 'space-between', textTransform: 'capitalize' }}>
             <span>{label}{isPast && <span style={{ fontSize: '0.7rem', marginLeft: '0.4rem', opacity: 0.8 }}>(arriéré)</span>}</span>
-            <span style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>{total.toFixed(2)} €</span>
+            <span style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>{formatEuro(total)}</span>
           </div>
           {its.map((d, i) => {
             const amt = useRemaining ? d.remaining : d.share;
@@ -54,7 +55,7 @@ const DetailAccordion = ({ details, mySettlements, currentMonthKey }) => {
                   </span>
                   {d.name}
                 </span>
-                <span style={{ fontWeight: '600', whiteSpace: 'nowrap', marginLeft: '0.5rem', fontSize: '0.8rem' }}>{amt.toFixed(2)} € <span style={{ opacity: 0.4 }}>/ {d.totalAmount?.toFixed(2)} €</span></span>
+                <span style={{ fontWeight: '600', whiteSpace: 'nowrap', marginLeft: '0.5rem', fontSize: '0.8rem' }}>{formatEuro(amt)} <span style={{ opacity: 0.4 }}>/ {formatEuro(d.totalAmount)}</span></span>
               </div>
             );
           })}
@@ -189,9 +190,9 @@ const Debts = ({ householdId }) => {
                       </div>
                       {total === 0 && <CheckCircle2 size={18} color="var(--success)" />}
                     </div>
-                    <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: total >= 0.01 ? 'var(--text-primary)' : 'var(--success)', margin: '0 0 0.25rem' }}>{total.toFixed(2)} €</p>
-                    {arrears >= 0.01 && <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: '600' }}>Dont {arrears.toFixed(2)} € d'arriérés</p>}
-                    {current >= 0.01 && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{current.toFixed(2)} € ce mois</p>}
+                    <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: total >= 0.01 ? 'var(--text-primary)' : 'var(--success)', margin: '0 0 0.25rem' }}>{formatEuro(total)}</p>
+                    {arrears >= 0.01 && <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: '600' }}>Dont {formatEuro(arrears)} d'arriérés</p>}
+                    {current >= 0.01 && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{formatEuro(current)} ce mois</p>}
                     <DetailAccordion details={debtsData.detailsCommon?.[m.id]?.[accId] || []} mySettlements={settles} currentMonthKey={currentMonthKey} />
                     {total >= 0.01 && (
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem', alignItems: 'center' }}>
@@ -221,8 +222,8 @@ const Debts = ({ householdId }) => {
                       </div>
                       {total === 0 && <CheckCircle2 size={18} color="var(--success)" />}
                     </div>
-                    <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: total >= 0.01 ? 'var(--text-primary)' : 'var(--success)', margin: '0 0 0.25rem' }}>{total.toFixed(2)} €</p>
-                    {arrears >= 0.01 && <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: '600' }}>Dont {arrears.toFixed(2)} € d'arriérés</p>}
+                    <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: total >= 0.01 ? 'var(--text-primary)' : 'var(--success)', margin: '0 0 0.25rem' }}>{formatEuro(total)}</p>
+                    {arrears >= 0.01 && <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: '600' }}>Dont {formatEuro(arrears)} d'arriérés</p>}
                     <DetailAccordion details={debtsData.detailsPartners?.[m.id]?.[partnerId] || []} mySettlements={settles} currentMonthKey={currentMonthKey} />
                     {total >= 0.01 && (
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem', alignItems: 'center' }}>
@@ -248,7 +249,7 @@ const Debts = ({ householdId }) => {
             <div key={s.id} className="card" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.875rem' }}>
               <div>
                 <strong>{settings.members.find(m => m.id === s.fromId)?.name}</strong> a versé{' '}
-                <strong style={{ margin: '0 0.25rem' }}>{s.amount.toFixed(2)} €</strong>
+                <strong style={{ margin: '0 0.25rem' }}>{formatEuro(s.amount)}</strong>
                 {s.type === 'common' ? 'au compte commun' : `à ${settings.members.find(m => m.id === s.toId)?.name}`}
               </div>
               <button onClick={() => deleteSettlement(householdId, s.id)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}>

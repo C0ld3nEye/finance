@@ -4,6 +4,7 @@ import { auth } from '../config/firebase';
 import { Save, Plus, Trash2, Home, Users, Lock, Calendar } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { repairAllCategories } from '../utils/categoryRepair';
+import { SettingsSkeleton } from '../components/SkeletonLoader';
 
 const Settings = ({ householdId, onHouseholdUpdate }) => {
   const [settings, setSettings] = useState(null);
@@ -64,7 +65,7 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
 
   const uid = auth.currentUser?.uid;
 
-  if (loading) return <div className="page-container" style={{ padding: '2rem' }}><p>Chargement…</p></div>;
+  if (loading) return <SettingsSkeleton />;
 
   return (
     <div className="page-container animate-fade-in">

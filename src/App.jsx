@@ -14,6 +14,7 @@ import Savings from './pages/Savings';
 import Projects from './pages/Projects';
 import Login from './pages/Login';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { GlobalSkeleton } from './components/SkeletonLoader';
 import './index.css';
 
 function App() {
@@ -50,11 +51,7 @@ function App() {
   }, []);
 
   if (loading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Chargement sécurisé...</p>
-      </div>
-    );
+    return <GlobalSkeleton />;
   }
 
   if (!user) {

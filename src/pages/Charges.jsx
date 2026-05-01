@@ -5,15 +5,17 @@ import { isChargeActiveInMonth, getAccountingMonth, shiftAccountingMonth, format
 import { auth } from '../config/firebase';
 import {
   Plus, Trash2, PieChart, Users, Lock, Edit2, X,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Landmark, Eye, Calendar, Info, RefreshCw
 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { CATEGORIES, getCategoryConfig } from '../constants/categories';
-import { calculateDistribution as calcDist, getAnnualChargeProgress } from '../utils/finance';
+import { calculateDistribution as calcDist, getAnnualChargeProgress, formatEuro, formatDistributionLabel } from '../utils/finance';
 import { findSalariesForMonth } from '../services/salaries';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+
 
 const emptyCharge = {
   name: '', amount: '', accountId: '', distributionType: 'prorata',
@@ -32,7 +34,7 @@ const DistributionPreview = ({ amount, type, customPct, customAmts, settings, ca
       {settings.members.map(m => (
         <div key={m.id} style={{ fontSize: '0.85rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>{m.name} : </span>
-          <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{(dist[m.id] || 0).toFixed(2)} €</span>
+          <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{formatEuro(dist[m.id])}</span>
         </div>
       ))}
     </div>
@@ -83,7 +85,7 @@ const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, c
               </div>
               <div>
                 <label className="label">Mensualité provisionnée</label>
-                <input className="input-field" disabled value={data.amount ? `${data.amount} € / mois` : '—'} style={{ opacity: 0.6 }} />
+                <input className="input-field" disabled value={data.amount ? `${formatEuro(data.amount)} / mois` : '—'} style={{ opacity: 0.6 }} />
               </div>
             </>
           ) : (
@@ -357,7 +359,7 @@ const Charges = ({ householdId }) => {
                           <div style={{ height: '100%', width: `${prog.progressPct}%`, background: prog.progressPct >= 100 ? 'var(--success)' : prog.isDueThisMonth ? 'var(--danger)' : 'var(--primary)', borderRadius: '2px', transition: 'width 0.4s ease' }} />
                         </div>
                         <span style={{ fontSize: '0.7rem', color: prog.isDueThisMonth ? 'var(--danger)' : prog.monthsUntilDue === 1 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: '600' }}>
-                          {prog.provisioned.toFixed(0)} / {prog.total.toFixed(0)} €
+                          {formatEuro(prog.provisioned, false)} / {formatEuro(prog.total, false)}
                           {prog.isDueThisMonth && ' · ⚠ Échéance ce mois'}
                           {prog.monthsUntilDue === 1 && !prog.isDueThisMonth && ' · Échéance le mois prochain'}
                         </span>
@@ -365,55 +367,108 @@ const Charges = ({ householdId }) => {
                     )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: 'var(--primary)' }}>{Number(charge.amount).toFixed(2)} €</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: 'var(--primary)' }}>{formatEuro(charge.amount)}</div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      {charge.distributionType === 'prorata' ? 'Prorata' : charge.distributionType === '50_50' ? '50/50' : charge.distributionType === 'hybrid' ? 'Hybride' : charge.distributionType === 'custom' ? '%' : '€ fixe'}
+                      {formatDistributionLabel(charge.distributionType, charge.customPercentages, charge.customAmounts, settings?.members)}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Détail accordéon */}
+              {/* Détail accordéon enrichi */}
               {isViewing && (
-                <div style={{ background: 'var(--surface-color)', border: '1px solid var(--border-solid)', borderTop: 'none', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)', padding: '1.1rem 1.25rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    <div>
-                      <p style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>Répartition</p>
-                      {settings?.members?.map(m => {
-                        const dist = calcDist2(charge.amount, charge.distributionType, charge.customPercentages, charge.customAmounts);
-                        return (
-                          <div key={m.id} className="detail-row">
-                            <span style={{ fontSize: '0.875rem' }}>{m.name}</span>
-                            <span style={{ fontWeight: '700' }}>{(dist[m.id] || 0).toFixed(2)} €</span>
-                          </div>
-                        );
-                      })}
+                <div className="accordion-content">
+                  <div className="info-grid">
+                    
+                    {/* Col 1: Répartition */}
+                    <div className="info-block">
+                      <p className="info-header"><PieChart size={12} /> Répartition</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {settings?.members?.map(m => {
+                          const dist = calcDist2(charge.amount, charge.distributionType, charge.customPercentages, charge.customAmounts);
+                          return (
+                            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>{m.name}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{formatEuro(dist[m.id])}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       {prog && (
-                        <>
-                          <p style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--primary)', marginTop: '0.875rem', marginBottom: '0.5rem' }}>Provision annuelle</p>
-                          {[
-                            { l: 'Montant annuel', v: `${prog.total.toFixed(2)} €` },
-                            { l: 'Provisionné', v: `${prog.provisioned.toFixed(2)} €`, c: 'var(--success)' },
-                            { l: 'Reste', v: `${prog.remaining.toFixed(2)} €`, c: prog.remaining > 0 ? 'var(--warning)' : 'var(--success)' },
-                            { l: 'Mois d\'échéance', v: charge.annualDueDate || '—' },
+                        <div style={{ marginTop: '1rem', padding: '0.875rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-solid)' }}>
+                          <p style={{ fontWeight: '800', fontSize: '0.65rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <RefreshCw size={12} /> Provision annuelle
+                          </p>
+                           {[
+                             { l: 'Total annuel', v: formatEuro(prog.total) },
+                             { l: 'Provisionné', v: formatEuro(prog.provisioned), c: 'var(--success)' },
+                             { l: 'Reste', v: formatEuro(prog.remaining), c: prog.remaining > 0 ? 'var(--warning)' : 'var(--success)' },
+                             { l: 'Échéance', v: charge.annualDueDate || '—' },
                           ].map(({ l, v, c }) => (
-                            <div key={l} className="detail-row">
-                              <span style={{ fontSize: '0.875rem' }}>{l}</span>
+                            <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.2rem' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>{l}</span>
                               <span style={{ fontWeight: '700', color: c }}>{v}</span>
                             </div>
                           ))}
-                        </>
+                        </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', justifyContent: 'center' }}>
-                      <button className="btn" style={{ border: '1px solid var(--border-solid)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                        onClick={e => { e.stopPropagation(); setEditingCharge({ ...charge }); setViewingId(null); }}>
-                        <Edit2 size={15} /> Modifier
-                      </button>
-                      <button className="btn" style={{ background: 'var(--danger-light)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                        onClick={e => { e.stopPropagation(); handleDelete(charge.id); setViewingId(null); }}>
-                        <Trash2 size={15} /> Supprimer
-                      </button>
+
+                    {/* Col 2: Configuration */}
+                    <div className="info-block">
+                      <p className="info-header"><Info size={12} /> Configuration</p>
+                      
+                      <div className="info-item">
+                        <Landmark size={14} className="info-item-icon" />
+                        <div className="info-item-content">
+                          <span className="info-label">Compte</span>
+                          <span className="info-value">{getAccountName(charge.accountId)}</span>
+                        </div>
+                      </div>
+
+                      <div className="info-item">
+                        <RefreshCw size={14} className="info-item-icon" />
+                        <div className="info-item-content">
+                          <span className="info-label">Fréquence</span>
+                          <span className="info-value">{charge.frequency === 'annual' ? 'Annuelle (lissée)' : 'Mensuelle'}</span>
+                        </div>
+                      </div>
+
+                      <div className="info-item">
+                        <PieChart size={14} className="info-item-icon" />
+                        <div className="info-item-content">
+                          <span className="info-label">Répartition</span>
+                          <span className="info-value">{formatDistributionLabel(charge.distributionType, charge.customPercentages, charge.customAmounts, settings?.members)}</span>
+                        </div>
+                      </div>
+
+                      <div className="info-item">
+                        <Calendar size={14} className="info-item-icon" />
+                        <div className="info-item-content">
+                          <span className="info-label">Échéance</span>
+                          <span className="info-value">Le {charge.dueDate || 1} du mois</span>
+                        </div>
+                      </div>
+
+                      <div className="info-item">
+                        <Eye size={14} className="info-item-icon" />
+                        <div className="info-item-content">
+                          <span className="info-label">Visibilité</span>
+                          <span className="info-value">{charge.visibility === 'shared' ? 'Foyer' : 'Personnel'}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-solid)' }}>
+                        <button className="btn" style={{ flex: 1, border: '1px solid var(--border-solid)', color: 'var(--text-secondary)', background: 'transparent', fontSize: '0.85rem' }}
+                          onClick={e => { e.stopPropagation(); setEditingCharge({ ...charge }); setViewingId(null); }}>
+                          <Edit2 size={15} style={{ marginRight: '5px' }} /> Modifier
+                        </button>
+                        <button className="btn" style={{ flex: 1, background: 'var(--danger-light)', color: 'var(--danger)', fontSize: '0.85rem' }}
+                          onClick={e => { e.stopPropagation(); handleDelete(charge.id); setViewingId(null); }}>
+                          <Trash2 size={15} style={{ marginRight: '5px' }} /> Supprimer
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -421,6 +476,7 @@ const Charges = ({ householdId }) => {
             </div>
           );
         })}
+
         {charges.length === 0 && !showAddForm && (
           <div className="empty-state">
             <p style={{ fontWeight: '700', marginBottom: '0.35rem' }}>Aucune charge pour ce mois</p>

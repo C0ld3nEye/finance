@@ -4,11 +4,13 @@ import { useHouseholdData } from '../hooks/useHouseholdData';
 import { isInAccountingMonth, getAccountingMonth, shiftAccountingMonth, formatAccountingMonthLabel } from '../utils/monthUtils';
 import { findSalariesForMonth } from '../services/salaries';
 import { auth } from '../config/firebase';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Edit2, X } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Edit2, X, Landmark, PieChart, Eye, User, Calendar, Info } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { CATEGORIES, getCategoryConfig } from '../constants/categories';
-import { calculateDistribution as calcDist } from '../utils/finance';
+import { calculateDistribution as calcDist, formatEuro, formatDistributionLabel } from '../utils/finance';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
+
+
 
 const emptyExpense = {
   description: '', amount: '', date: new Date().toISOString().slice(0, 10),
@@ -25,7 +27,7 @@ const DistPreview = ({ amount, type, customPct, customAmts, settings, calcDist2 
       {settings.members.map(m => (
         <span key={m.id} style={{ fontSize: '0.8rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>{m.name} : </span>
-          <span style={{ fontWeight: '700' }}>{(dist[m.id] || 0).toFixed(2)} €</span>
+          <span style={{ fontWeight: '700' }}>{formatEuro(dist[m.id])}</span>
         </span>
       ))}
     </div>
@@ -286,7 +288,7 @@ const Expenses = ({ householdId }) => {
       {expenses.length > 0 && (
         <div className="card" style={{ padding: '0.875rem 1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="label" style={{ margin: 0 }}>{expenses.length} dépense{expenses.length > 1 ? 's' : ''} ce mois</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)' }}>{totalMonth.toFixed(2)} €</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)' }}>{formatEuro(totalMonth)}</span>
         </div>
       )}
 
@@ -296,55 +298,112 @@ const Expenses = ({ householdId }) => {
 
       {/* Liste groupée par jour */}
       {Object.keys(byDate).length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {Object.entries(byDate).map(([day, items]) => (
             <div key={day}>
-              <p style={{ fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.4rem', paddingLeft: '0.25rem' }}>
-                {day.replace(/^\w/, c => c.toUpperCase())}
-              </p>
+              <h3 style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.75rem', marginLeft: '0.5rem' }}>
+                {day}
+              </h3>
               <div className="card" style={{ padding: '0.25rem 0' }}>
                 {items.map((exp, i) => {
-                  const catCfg = getCategoryConfig(exp.category);
-                  const isViewing = viewingId === exp.id;
                   const dist = calcDist2(exp.amount, exp.distributionType, exp.customPercentages, exp.customAmounts);
+                  const isViewing = viewingId === exp.id;
+                  const CategoryIcon = getCategoryConfig(exp.category).icon;
+
                   return (
                     <div key={exp.id}>
-                      <div style={{ padding: '0.75rem 1.1rem', cursor: 'pointer' }}
-                        onClick={() => setViewingId(isViewing ? null : exp.id)}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: '700', fontSize: '0.9rem', marginBottom: '0.2rem' }}>{exp.description}</div>
-                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                              <span style={{ padding: '0.1rem 0.4rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: '600', background: catCfg.bg, color: catCfg.color }}>
-                                {React.createElement(catCfg.icon, { size: 10 })} {exp.category}
-                              </span>
+                      <div style={{ padding: '0.75rem 1.1rem', cursor: 'pointer' }} onClick={() => setViewingId(isViewing ? null : exp.id)}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ flex: 1, paddingRight: '1rem', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                              <CategoryIcon size={16} color="var(--text-secondary)" />
+                              <span style={{ fontWeight: '600' }}>{exp.description}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                 {getAccName(exp.accountId)} · Payé par {getMemName(exp.paidBy)}
                               </span>
                             </div>
-                            {/* Détail répartition inline */}
+                            
+                            {/* Détails accordéon enrichis */}
                             {isViewing && (
-                              <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                {settings?.members?.map(m => (
-                                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>{m.name}</span>
-                                    <span style={{ fontWeight: '700' }}>{(dist[m.id] || 0).toFixed(2)} €</span>
+                              <div style={{ background: 'var(--bg-subtle)', borderTop: '1px solid var(--border-solid)', padding: '1.25rem 1.5rem', marginTop: '0.5rem' }}>
+                                <div className="info-grid">
+                                  
+                                  {/* Col 1: Répartition */}
+                                  <div className="info-block">
+                                    <p className="info-header"><PieChart size={12} /> Répartition</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                      {settings?.members?.map(m => (
+                                        <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                          <span style={{ color: 'var(--text-secondary)' }}>{m.name}</span>
+                                          <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{formatEuro(dist[m.id])}</span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                ))}
-                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                  <button className="btn-small" onClick={e => { e.stopPropagation(); setEditingExpense({ ...exp, date: exp.date?.slice(0, 10) || '' }); setViewingId(null); }}>
-                                    <Edit2 size={11} style={{ display: 'inline', marginRight: '3px' }} /> Modifier
+
+                                  {/* Col 2: Info Technique */}
+                                  <div className="info-block">
+                                    <p className="info-header"><Info size={12} /> Détails</p>
+                                    <div className="info-item">
+                                      <Landmark size={13} className="info-item-icon" />
+                                      <div className="info-item-content">
+                                        <span className="info-label">Compte</span>
+                                        <span className="info-value">{getAccName(exp.accountId)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="info-item">
+                                      <PieChart size={13} className="info-item-icon" />
+                                      <div className="info-item-content">
+                                        <span className="info-label">Répartition</span>
+                                        <span className="info-value">{formatDistributionLabel(exp.distributionType, exp.customPercentages, exp.customAmounts, settings?.members)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="info-item">
+                                      <Eye size={13} className="info-item-icon" />
+                                      <div className="info-item-content">
+                                        <span className="info-label">Visibilité</span>
+                                        <span className="info-value">{exp.visibility === 'shared' ? 'Foyer' : 'Personnel'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Col 3: Historique */}
+                                  <div className="info-block">
+                                    <p className="info-header"><Calendar size={12} /> Historique</p>
+                                    <div className="info-item">
+                                      <User size={13} className="info-item-icon" />
+                                      <div className="info-item-content">
+                                        <span className="info-label">Saisie par</span>
+                                        <span className="info-value">{getMemName(exp.userId || exp.createdBy)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="info-item">
+                                      <Calendar size={13} className="info-item-icon" />
+                                      <div className="info-item-content">
+                                        <span className="info-label">Date</span>
+                                        <span className="info-value">{new Date(exp.date || exp.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-solid)' }}>
+                                  <button className="btn" style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem', border: '1px solid var(--border-solid)', background: 'transparent' }} 
+                                    onClick={e => { e.stopPropagation(); setEditingExpense({ ...exp, date: exp.date?.slice(0, 10) || '' }); setViewingId(null); }}>
+                                    <Edit2 size={14} style={{ marginRight: '5px' }} /> Modifier
                                   </button>
-                                  <button className="btn-small" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}
+                                  <button className="btn" style={{ flex: 1, padding: '0.6rem', fontSize: '0.85rem', background: 'var(--danger-light)', color: 'var(--danger)' }}
                                     onClick={e => { e.stopPropagation(); handleDelete(exp.id); setViewingId(null); }}>
-                                    <Trash2 size={11} style={{ display: 'inline', marginRight: '3px' }} /> Supprimer
+                                    <Trash2 size={14} style={{ marginRight: '5px' }} /> Supprimer
                                   </button>
                                 </div>
                               </div>
                             )}
                           </div>
                           <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--primary)', flexShrink: 0 }}>
-                            {Number(exp.amount).toFixed(2)} €
+                            {formatEuro(exp.amount)}
                           </span>
                         </div>
                       </div>
@@ -363,7 +422,6 @@ const Expenses = ({ householdId }) => {
         </div>
       )}
 
-      {/* Modal modification */}
       {editingExpense && (
         <div className="modal-overlay" onClick={() => setEditingExpense(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>

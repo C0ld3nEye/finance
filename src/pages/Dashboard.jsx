@@ -5,7 +5,7 @@ import { useHouseholdData } from '../hooks/useHouseholdData';
 import { isChargeVisibleTo } from '../services/charges';
 import { isExpenseVisibleTo } from '../services/expenses';
 import { getAccountingMonth, isInAccountingMonth, isChargeActiveInMonth, formatAccountingMonthLabel } from '../utils/monthUtils';
-import { calculateDistribution, getAnnualChargeProgress } from '../utils/finance';
+import { calculateDistribution, getAnnualChargeProgress, formatEuro } from '../utils/finance';
 import { findSalariesForMonth } from '../services/salaries';
 import {
   TrendingDown, Wallet, User, AlertTriangle, PiggyBank,
@@ -83,9 +83,12 @@ const Dashboard = ({ householdId }) => {
 
     // Ma part des charges foyer
     const refDate = new Date(currentYear, currentMonth, 15);
-    let myHouseContribution = 0;
-    houseCharges.forEach(c => { myHouseContribution += calcShares(c, refDate)[uid] || 0; });
-    houseExpenses.forEach(e => { myHouseContribution += calcShares(e, refDate)[uid] || 0; });
+    let myHouseContribCharges = 0;
+    houseCharges.forEach(c => { myHouseContribCharges += calcShares(c, refDate)[uid] || 0; });
+    let myHouseContribExpenses = 0;
+    houseExpenses.forEach(e => { myHouseContribExpenses += calcShares(e, refDate)[uid] || 0; });
+
+    const myHouseContribution = myHouseContribCharges + myHouseContribExpenses;
 
     // Catégories
     const categoryData = {};
@@ -172,7 +175,8 @@ const Dashboard = ({ householdId }) => {
       tHouseCharges, tHouseExpenses, tPersoCharges, tPersoExpenses,
       totalIncome, mySalary, salairesSaisis,
       monthlySavingsShared, monthlySavingsPerso,
-      myHouseContribution, remaining, myRestAVivre,
+      myHouseContribution, myHouseContribExpenses, myHouseContribCharges,
+      remaining, myRestAVivre,
       categoryData, trendData, upcomingAnnualCharges,
       myPendingDebt: totalArrears + totalCurrent,
       myPendingArrears: totalArrears,
@@ -186,16 +190,34 @@ const Dashboard = ({ householdId }) => {
     tHouseCharges, tHouseExpenses, tPersoCharges, tPersoExpenses,
     totalIncome, mySalary, salairesSaisis,
     monthlySavingsShared, monthlySavingsPerso,
-    myHouseContribution, remaining, myRestAVivre,
+    myHouseContribution, myHouseContribExpenses, myHouseContribCharges,
+    remaining, myRestAVivre,
     categoryData, trendData, upcomingAnnualCharges,
     myPendingDebt,
   } = computed;
 
   const totalSpent = tHouseCharges + tHouseExpenses + monthlySavingsShared;
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const dayOfMonth = now.getDate();
+  
+  // Correction: Calcul exact du temps écoulé dans le mois comptable actuel
+  const periodStart = new Date(currentYear, currentMonth, startDay);
+  const periodEnd = startDay <= 1 
+    ? new Date(currentYear, currentMonth + 1, 0) 
+    : new Date(currentYear, currentMonth + 1, startDay - 1);
+    
+  let accountingDayOfMonth = Math.floor((now - periodStart) / (1000 * 60 * 60 * 24)) + 1;
+  accountingDayOfMonth = Math.max(1, accountingDayOfMonth); // Éviter division par 0
+  
+  const accountingDaysInMonth = Math.floor((periodEnd - periodStart) / (1000 * 60 * 60 * 24)) + 1;
+
+  const projectedExpenses = (tHouseExpenses / accountingDayOfMonth) * accountingDaysInMonth;
   const projectedRemaining = salairesSaisis
-    ? totalIncome - (totalSpent / Math.max(dayOfMonth, 1)) * daysInMonth
+    ? totalIncome - tHouseCharges - monthlySavingsShared - projectedExpenses
+    : null;
+
+  const projectedPersoExpenses = (tPersoExpenses / accountingDayOfMonth) * accountingDaysInMonth;
+  const projectedMyHouseContribExpenses = (myHouseContribExpenses / accountingDayOfMonth) * accountingDaysInMonth;
+  const projectedPersoRemaining = salairesSaisis
+    ? mySalary - myHouseContribCharges - projectedMyHouseContribExpenses - projectedPersoExpenses - tPersoCharges - monthlySavingsPerso
     : null;
 
   const monthLabel = formatAccountingMonthLabel(currentYear, currentMonth, startDay).replace(/^\w/, c => c.toUpperCase());
@@ -249,15 +271,15 @@ const Dashboard = ({ householdId }) => {
               <span className="label">Reste foyer</span>
               {remaining === null
                 ? <span className="error-text">⚠ Salaires non saisis</span>
-                : <p className="value-large" style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{remaining.toFixed(2)} €</p>}
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>sur {totalIncome.toFixed(0)} € revenus</span>
+                : <p className="value-large" style={{ color: remaining >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatEuro(remaining)}</p>}
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>sur {formatEuro(totalIncome, false)} revenus</span>
             </div>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="label">Prévision fin de mois</span>
               {projectedRemaining === null
                 ? <span className="error-text">⚠ Salaires manquants</span>
-                : <p className="value-large" style={{ color: projectedRemaining >= 0 ? 'var(--warning)' : 'var(--danger)' }}>{projectedRemaining.toFixed(2)} €</p>}
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>j.{dayOfMonth} / {daysInMonth}</span>
+                : <p className="value-large" style={{ color: projectedRemaining >= 0 ? 'var(--warning)' : 'var(--danger)' }}>{formatEuro(projectedRemaining)}</p>}
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>j.{accountingDayOfMonth} / {accountingDaysInMonth}</span>
             </div>
           </div>
 
@@ -286,7 +308,7 @@ const Dashboard = ({ householdId }) => {
           </div>
 
           {savings.filter(s => s.visibility === 'shared').length > 0 && (
-            <div className="card" style={{ padding: '1rem 1.25rem' }}>
+            <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h3 className="label" style={{ margin: 0 }}>Épargne foyer</h3>
                 <button onClick={() => navigate('/savings')} className="btn-small">Gérer →</button>
@@ -298,7 +320,7 @@ const Dashboard = ({ householdId }) => {
                     <span style={{ fontSize: '0.875rem' }}>{s.name}</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>— {s.destination}</span>
                   </div>
-                  <span style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '0.875rem' }}>{Number(s.amount).toFixed(0)} €</span>
+                  <span style={{ fontWeight: '700', color: 'var(--accent)', fontSize: '0.875rem' }}>{formatEuro(s.amount, false)}</span>
                 </div>
               ))}
             </div>
@@ -325,44 +347,46 @@ const Dashboard = ({ householdId }) => {
               <button onClick={() => navigate('/debts')} className="btn-small">Régler →</button>
             </div>
             <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: '400', color: myPendingDebt > 0 ? 'var(--warning)' : myPendingDebt < 0 ? 'var(--success)' : 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-              {myPendingDebt > 0 ? '−' : myPendingDebt < 0 ? '+' : ''}{Math.abs(myPendingDebt).toFixed(2)} €
+              {myPendingDebt > 0 ? '−' : myPendingDebt < 0 ? '+' : ''}{formatEuro(Math.abs(myPendingDebt))}
             </p>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               {myPendingDebt > 0 ? 'Vous devez reverser au foyer' : myPendingDebt < 0 ? 'Le foyer vous doit' : 'Tout est à jour !'}
             </p>
             {computed.myPendingArrears > 0 && (
               <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: '600', marginTop: '0.25rem' }}>
-                Dont {computed.myPendingArrears.toFixed(2)} € d'arriérés
+                Dont {formatEuro(computed.myPendingArrears)} d'arriérés
               </p>
             )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="label">Mon salaire</span>
-              <p className="value-large" style={{ color: 'var(--primary)' }}>{mySalary.toFixed(2)} €</p>
-              {mySalary === 0 && <span className="error-text" style={{ fontSize: '0.8rem' }}>⚠ Non saisi</span>}
+              <span className="label">Reste à vivre</span>
+              <p className="value-large" style={{ color: myRestAVivre >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatEuro(myRestAVivre)}</p>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>sur {formatEuro(mySalary, false)} de revenus</span>
             </div>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="label">Reste à vivre</span>
-              <p className="value-large" style={{ color: myRestAVivre >= 0 ? 'var(--success)' : 'var(--danger)' }}>{myRestAVivre.toFixed(2)} €</p>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>après parts & épargne</span>
+              <span className="label">Prévision fin de mois</span>
+              {projectedPersoRemaining === null
+                ? <span className="error-text">⚠ Non disponible</span>
+                : <p className="value-large" style={{ color: projectedPersoRemaining >= 0 ? 'var(--warning)' : 'var(--danger)' }}>{formatEuro(projectedPersoRemaining)}</p>}
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>j.{accountingDayOfMonth} / {accountingDaysInMonth}</span>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="label">Ma part foyer</span>
-              <p className="value-large" style={{ color: '#8b5cf6' }}>{myHouseContribution.toFixed(2)} €</p>
+              <p className="value-large" style={{ color: '#8b5cf6' }}>{formatEuro(myHouseContribution)}</p>
             </div>
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="label">Dépenses perso</span>
-              <p className="value-large" style={{ color: 'var(--danger)' }}>{(tPersoExpenses + tPersoCharges).toFixed(2)} €</p>
+              <p className="value-large" style={{ color: 'var(--danger)' }}>{formatEuro(tPersoExpenses + tPersoCharges)}</p>
             </div>
           </div>
 
           {savings.filter(s => s.visibility === 'perso').length > 0 && (
-            <div className="card" style={{ padding: '1rem 1.25rem' }}>
+            <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h3 className="label" style={{ margin: 0 }}>Mon épargne</h3>
                 <button onClick={() => navigate('/savings')} className="btn-small">Gérer →</button>
@@ -374,7 +398,7 @@ const Dashboard = ({ householdId }) => {
                     <span style={{ fontSize: '0.875rem' }}>{s.name}</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>— {s.destination}</span>
                   </div>
-                  <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '0.875rem' }}>{Number(s.amount).toFixed(0)} €</span>
+                  <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '0.875rem' }}>{formatEuro(s.amount, false)}</span>
                 </div>
               ))}
             </div>
@@ -421,7 +445,7 @@ const Dashboard = ({ householdId }) => {
               const isReached = p.status === 'reached';
               return (
                 <div key={p.id} className="card" onClick={() => navigate('/projects')}
-                  style={{ padding: '0.875rem 1.25rem', cursor: 'pointer' }}>
+                  style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div className="icon-badge" style={{ background: isReached ? 'var(--success-light)' : 'var(--primary-light)', color: isReached ? 'var(--success)' : 'var(--primary)', flexShrink: 0 }}>
                       {isReached ? <Check size={16} /> : <Icon size={16} />}
@@ -435,7 +459,7 @@ const Dashboard = ({ householdId }) => {
                         <div style={{ height: '100%', width: `${pct}%`, background: isReached ? 'var(--success)' : 'var(--primary-gradient)', borderRadius: '3px', transition: 'width 0.6s ease' }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{Number(p.currentAmount || 0).toFixed(0)} € / {Number(p.targetAmount).toFixed(0)} €</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatEuro(p.currentAmount || 0, false)} / {formatEuro(p.targetAmount, false)}</span>
                         {p.targetDate && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(p.targetDate).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })}</span>}
                       </div>
                     </div>
@@ -465,7 +489,7 @@ const Dashboard = ({ householdId }) => {
             {remaining !== null && remaining < 0 && (
               <div className="alert-banner alert-banner-danger">
                 <span>⚠️</span>
-                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>Budget foyer dépassé de {Math.abs(remaining).toFixed(2)} €.</span>
+                <span style={{ color: 'var(--danger)', fontWeight: '600' }}>Budget foyer dépassé de {formatEuro(Math.abs(remaining))}.</span>
               </div>
             )}
             {upcomingAnnualCharges?.map(c => {
@@ -474,8 +498,8 @@ const Dashboard = ({ householdId }) => {
                 <div key={c.id} className={`alert-banner ${prog.isDueThisMonth ? 'alert-banner-danger' : 'alert-banner-warning'}`}>
                   <span>{prog.isDueThisMonth ? '📅' : '⚡'}</span>
                   <span>
-                    <strong>{c.name}</strong> — {prog.isDueThisMonth ? 'échéance ce mois !' : 'échéance le mois prochain'} ({c.annualAmount} €)
-                    {prog.remaining > 0 && <span style={{ color: 'var(--danger)', fontWeight: '700' }}> — manque {prog.remaining.toFixed(2)} €</span>}
+                    <strong>{c.name}</strong> — {prog.isDueThisMonth ? 'échéance ce mois !' : 'échéance le mois prochain'} ({formatEuro(c.annualAmount, false)})
+                    {prog.remaining > 0 && <span style={{ color: 'var(--danger)', fontWeight: '700' }}> — manque {formatEuro(prog.remaining)}</span>}
                   </span>
                 </div>
               );

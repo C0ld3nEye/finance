@@ -12,6 +12,7 @@ import {
 import { useConfirm } from '../context/ConfirmContext';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
 import InlineForm, { FormField, ToggleGroup } from '../components/InlineForm';
+import { formatEuro } from '../utils/finance';
 
 const PROJECT_ICONS = {
   Vacances: Plane, Voiture: Car, Logement: Home, Travaux: Wrench,
@@ -181,8 +182,8 @@ const Projects = ({ householdId }) => {
               <div style={{ margin: '0.6rem 0 0.4rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
                   <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    {Number(p.currentAmount || 0).toFixed(0)} €
-                    <span style={{ fontWeight: '400', color: 'var(--text-muted)' }}> / {Number(p.targetAmount).toFixed(0)} €</span>
+                    {formatEuro(p.currentAmount || 0, false)}
+                    <span style={{ fontWeight: '400', color: 'var(--text-muted)' }}> / {formatEuro(p.targetAmount, false)}</span>
                   </span>
                   <span style={{ fontWeight: '700', color: isReached ? 'var(--success)' : 'var(--primary)' }}>{pct.toFixed(0)} %</span>
                 </div>
@@ -206,7 +207,7 @@ const Projects = ({ householdId }) => {
                 )}
                 {monthlyNeeded && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: '600' }}>
-                    ~{monthlyNeeded.toFixed(0)} €/mois
+                    ~{formatEuro(monthlyNeeded, false)} / mois
                   </span>
                 )}
                 {isReached && (
@@ -290,7 +291,7 @@ const Projects = ({ householdId }) => {
                   return (
                     <div key={ri} className="detail-row" style={{ fontSize: '0.8rem' }}>
                       <div>
-                        <span style={{ fontWeight: '600' }}>{Number(c.amount).toFixed(0)} €</span>
+                        <span style={{ fontWeight: '600' }}>{formatEuro(c.amount, false)}</span>
                         {c.note && <span style={{ color: 'var(--text-muted)', marginLeft: '0.4rem' }}>— {c.note}</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -401,11 +402,11 @@ const Projects = ({ householdId }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.1rem' }}>
           <div className="card" style={{ padding: '0.875rem 1rem' }}>
             <span className="label">Total mis de côté</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)', marginTop: '0.2rem' }}>{totalCurrent.toFixed(0)} €</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)', marginTop: '0.2rem' }}>{formatEuro(totalCurrent, false)}</p>
           </div>
           <div className="card" style={{ padding: '0.875rem 1rem' }}>
             <span className="label">Objectif total</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>{totalTarget.toFixed(0)} €</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>{formatEuro(totalTarget, false)}</p>
           </div>
         </div>
       )}

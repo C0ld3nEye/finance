@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, PiggyBank, Landmark, Wallet, TrendingUp, MoreHoriz
 import { useConfirm } from '../context/ConfirmContext';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
 import InlineForm, { FormField, ToggleGroup } from '../components/InlineForm';
+import { formatEuro } from '../utils/finance';
 
 const DESTINATION_ICONS = {
   'Livret A': PiggyBank,
@@ -134,7 +135,7 @@ const Savings = ({ householdId }) => {
           fontFamily: 'var(--font-display)', fontSize: '1.2rem',
           color: 'var(--primary)', lineHeight: 1,
         }}>
-          {Number(s.amount).toFixed(0)} €
+          {formatEuro(s.amount, false)}
           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'var(--font-body)', marginLeft: '2px' }}>/mois</span>
         </span>
         <button onClick={() => openEdit(s)} style={{ color: 'var(--text-muted)', padding: '0.3rem', borderRadius: '6px', transition: 'color 0.15s' }}
@@ -214,11 +215,11 @@ const Savings = ({ householdId }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.1rem' }}>
           <div className="card" style={{ padding: '0.875rem 1rem' }}>
             <span className="label">Total mensuel</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)', marginTop: '0.2rem' }}>{totalMonthly.toFixed(0)} €</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--primary)', marginTop: '0.2rem' }}>{formatEuro(totalMonthly, false)}</p>
           </div>
           <div className="card" style={{ padding: '0.875rem 1rem' }}>
             <span className="label">Part foyer</span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>{totalShared.toFixed(0)} €</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>{formatEuro(totalShared, false)}</p>
           </div>
         </div>
       )}

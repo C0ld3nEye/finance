@@ -40,31 +40,33 @@ export const calculateDistribution = (
       ? Number(resolvedSalaries[member.id])
       : Number(member.salary || 0);
 
+  const roundCents = (val) => Math.round(val * 100) / 100;
+
   if (distType === '50_50') {
     const share = numAmount / members.length;
-    return Object.fromEntries(members.map((m) => [m.id, share]));
+    return Object.fromEntries(members.map((m) => [m.id, roundCents(share)]));
   }
 
   if (distType === 'prorata') {
     const totalSal = members.reduce((acc, m) => acc + getSalary(m), 0);
     if (totalSal === 0) {
       const share = numAmount / members.length;
-      return Object.fromEntries(members.map((m) => [m.id, share]));
+      return Object.fromEntries(members.map((m) => [m.id, roundCents(share)]));
     }
     return Object.fromEntries(
-      members.map((m) => [m.id, numAmount * (getSalary(m) / totalSal)])
+      members.map((m) => [m.id, roundCents(numAmount * (getSalary(m) / totalSal))])
     );
   }
 
   if (distType === 'custom') {
     return Object.fromEntries(
-      members.map((m) => [m.id, (numAmount * (customPercentages[m.id] || 0)) / 100])
+      members.map((m) => [m.id, roundCents((numAmount * (customPercentages[m.id] || 0)) / 100)])
     );
   }
 
   if (distType === 'custom_amount') {
     return Object.fromEntries(
-      members.map((m) => [m.id, Number(customAmounts[m.id] || 0)])
+      members.map((m) => [m.id, roundCents(Number(customAmounts[m.id] || 0))])
     );
   }
 
@@ -78,7 +80,7 @@ export const calculateDistribution = (
           totalSal > 0
             ? (remainder * getSalary(m)) / totalSal
             : remainder / members.length;
-        return [m.id, prorataShare + Number(customAmounts[m.id] || 0)];
+        return [m.id, roundCents(prorataShare + Number(customAmounts[m.id] || 0))];
       })
     );
   }
@@ -89,9 +91,56 @@ export const calculateDistribution = (
 /**
  * Formatte un montant en euros.
  * @param {number} value
+ * @param {boolean} showDecimals - Si faux, n'affiche pas de virgule (utile pour les graphiques ou les grands nombres)
  * @returns {string}
  */
-export const formatEuro = (value) => `${Number(value || 0).toFixed(2)} €`;
+export const formatEuro = (value, showDecimals = true) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: showDecimals ? 2 : 0,
+    maximumFractionDigits: showDecimals ? 2 : 0
+  }).format(value || 0);
+};
+
+/**
+ * Formatte le libellé du type de répartition avec des détails dynamiques.
+ * @param {string} distType
+ * @param {Object} customPercentages
+ * @param {Object} customAmounts
+ * @param {Array} members
+ * @returns {string}
+ */
+export const formatDistributionLabel = (distType, customPercentages, customAmounts, members) => {
+  if (distType === 'prorata') return 'Prorata des revenus';
+  if (distType === '50_50') return 'Partage égal (50/50)';
+  
+  if (distType === 'custom') {
+    if (!members || members.length === 0) return 'Pourcentages fixes';
+    const parts = members.map(m => `${m.name} ${customPercentages?.[m.id] || 0}%`);
+    return `Pourcentages (${parts.join(' / ')})`;
+  }
+  
+  if (distType === 'custom_amount') {
+    if (!members || members.length === 0) return 'Montants fixes';
+    const parts = members.map(m => `${m.name} ${formatEuro(customAmounts?.[m.id] || 0, false)}`);
+    return `Montants fixes (${parts.join(' / ')})`;
+  }
+  
+  if (distType === 'hybrid') {
+    if (!members || members.length === 0) return 'Hybride (Fixe + Prorata)';
+    const fixedParts = members
+      .filter(m => Number(customAmounts?.[m.id]) > 0)
+      .map(m => `${m.name} ${formatEuro(customAmounts[m.id], false)}`);
+      
+    if (fixedParts.length > 0) {
+      return `Hybride (Fixe ${fixedParts.join(' & ')} / reste prorata)`;
+    }
+    return 'Hybride (Fixe + Prorata)';
+  }
+  
+  return distType || 'Inconnu';
+};
 
 /**
  * Retourne le montant mensuel effectif d'une charge.

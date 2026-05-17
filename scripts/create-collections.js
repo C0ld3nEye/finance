@@ -44,11 +44,15 @@ async function main() {
   // 2. Ajout du champ householdId sur la collection users (built-in)
   console.log('\n📦 Extension de la collection users...');
   const usersCol = await apiRequest('collections/users', 'GET', null, token);
-  const hasHouseholdId = usersCol.schema?.some(f => f.name === 'householdId');
+  const hasHouseholdId = usersCol.schema?.some(f => f.name === 'householdId') || usersCol.fields?.some(f => f.name === 'householdId');
   if (!hasHouseholdId) {
     await apiRequest('collections/users', 'PATCH', {
       schema: [
         ...(usersCol.schema || []),
+        { name: 'householdId', type: 'text', required: false },
+      ],
+      fields: [
+        ...(usersCol.fields || []),
         { name: 'householdId', type: 'text', required: false },
       ],
       createRule: "", // Autorise la création de compte publique
@@ -157,27 +161,61 @@ async function main() {
     },
   ];
 
-  // 4. Création des collections
-  console.log('\n📦 Création des collections...');
+  // 4. Création / Mise à jour des collections
+  console.log('\n📦 Création et alignement des collections...');
   for (const col of collections) {
     try {
-      await apiRequest('collections', 'POST', {
-        name: col.name,
-        type: 'base',
-        schema: col.schema,
-        listRule: '@request.auth.id != ""',
-        viewRule: '@request.auth.id != ""',
-        createRule: '@request.auth.id != ""',
-        updateRule: '@request.auth.id != ""',
-        deleteRule: '@request.auth.id != ""',
-      }, token);
-      console.log(`  ✅ ${col.name}`);
-    } catch (err) {
-      if (err.message.includes('already exists') || err.message.includes('400')) {
-        console.log(`  ⏭️  ${col.name} (déjà existante)`);
-      } else {
-        console.error(`  ❌ ${col.name} : ${err.message}`);
+      // 1. Tenter d'obtenir la collection existante
+      let existingCol = null;
+      try {
+        existingCol = await apiRequest(`collections/${col.name}`, 'GET', null, token);
+      } catch (e) {
+        // La collection n'existe pas encore
       }
+
+      if (existingCol) {
+        // La collection existe déjà, on la met à jour pour s'assurer que ses champs sont présents
+        console.log(`  ⚙️  Mise à jour de la collection "${col.name}"...`);
+        
+        // Sous PocketBase v0.22+, il faut préserver les champs systèmes existants (comme id, created, updated) dans l'array fields
+        const existingFields = existingCol.fields || [];
+        const newFields = [...existingFields];
+        
+        // Ajouter les champs personnalisés s'ils n'existent pas déjà
+        col.schema.forEach(newField => {
+          if (!newFields.some(f => f.name === newField.name)) {
+            newFields.push(newField);
+          }
+        });
+
+        await apiRequest(`collections/${col.name}`, 'PATCH', {
+          schema: col.schema,
+          fields: newFields,
+          listRule: '@request.auth.id != ""',
+          viewRule: '@request.auth.id != ""',
+          createRule: '@request.auth.id != ""',
+          updateRule: '@request.auth.id != ""',
+          deleteRule: '@request.auth.id != ""',
+        }, token);
+        console.log(`  ✅ Collection "${col.name}" alignée avec succès`);
+      } else {
+        // Créer la collection
+        console.log(`  ➕ Création de la collection "${col.name}"...`);
+        await apiRequest('collections', 'POST', {
+          name: col.name,
+          type: 'base',
+          schema: col.schema,
+          fields: col.schema,
+          listRule: '@request.auth.id != ""',
+          viewRule: '@request.auth.id != ""',
+          createRule: '@request.auth.id != ""',
+          updateRule: '@request.auth.id != ""',
+          deleteRule: '@request.auth.id != ""',
+        }, token);
+        console.log(`  ✅ Collection "${col.name}" créée avec succès`);
+      }
+    } catch (err) {
+      console.error(`  ❌ Erreur sur la collection "${col.name}" : ${err.message}`);
     }
   }
 

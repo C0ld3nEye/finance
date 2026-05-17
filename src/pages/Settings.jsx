@@ -50,13 +50,13 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
   };
 
   const handleMemberChange = (i, field, value) => {
-    const m = [...settings.members];
+    const m = [...(settings.members || [])];
     m[i][field] = value;
     setSettings({ ...settings, members: m });
   };
 
   const toggleAccountVisibility = (i) => {
-    const a = [...settings.accounts];
+    const a = [...(settings.accounts || [])];
     const isShared = (a[i].visibility || 'shared') === 'shared';
     a[i].visibility = isShared ? 'private' : 'shared';
     if (!isShared) delete a[i].ownerId;
@@ -131,7 +131,7 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
           <div className="card">
             <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1.25rem' }}>Membres du foyer</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {settings.members.map((member, idx) => {
+              {(settings.members || []).map((member, idx) => {
                 const isMe = member.id === uid;
                 return (
                   <div key={member.id} style={{ padding: '0.875rem', background: isMe ? 'var(--primary-light)' : 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: isMe ? '1px solid var(--primary)' : 'none' }}>
@@ -172,7 +172,7 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {settings.accounts.map((acc, idx) => {
+              {(settings.accounts || []).map((acc, idx) => {
                 const isMine = acc.ownerId === uid;
                 const isShared = acc.visibility === 'shared';
                 if (!isShared && !isMine) return null;

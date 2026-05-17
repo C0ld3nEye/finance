@@ -1,5 +1,4 @@
-import { collection, getDocs, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
 const CATEGORY_MAPPING = {
   'Alimentation': ['course', 'carrefour', 'leclerc', 'lidl', 'monoprix', 'boulangerie', 'picard', 'resto', 'intermarche', 'super u', 'aldi', 'franprix', 'casino', 'auchan', 'mcdo', 'burger king', 'pizza', 'deliveroo', 'uber eats'],
@@ -27,7 +26,7 @@ export const guessCategory = (label) => {
 };
 
 /**
- * Parcourt une collection Firestore et met à jour les documents
+ * Parcourt une collection PocketBase et met à jour les documents
  * sans catégorie (ou catégorisés "Autre") via le mapping de mots-clés.
  *
  * @param {string} householdId
@@ -35,14 +34,15 @@ export const guessCategory = (label) => {
  * @returns {Promise<number>} Nombre de documents mis à jour.
  */
 const repairCollection = async (householdId, collectionName) => {
-  const snap = await getDocs(collection(db, 'households', householdId, collectionName));
+  const records = await pb.collection(collectionName).getFullList({
+    filter: `householdId = "${householdId}"`,
+  });
   let count = 0;
-  for (const d of snap.docs) {
-    const data = d.data();
-    if (!data.category || data.category === 'Autre') {
-      const guessed = guessCategory(data.description || data.name);
+  for (const record of records) {
+    if (!record.category || record.category === 'Autre') {
+      const guessed = guessCategory(record.description || record.name || record.label);
       if (guessed) {
-        await updateDoc(d.ref, { category: guessed });
+        await pb.collection(collectionName).update(record.id, { category: guessed });
         count++;
       }
     }

@@ -1,5 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
 /**
  * Filtre client : une dépense est visible si partagée ou appartient à l'uid.
@@ -13,14 +12,14 @@ export const isExpenseVisibleTo = (expense, uid) => {
 
 export const addExpense = async (householdId, uid, expense) => {
   const data = { ...expense, userId: uid, householdId };
-  const ref = await addDoc(collection(db, 'households', householdId, 'expenses'), data);
-  return { id: ref.id, ...data };
+  const record = await pb.collection('expenses').create(data);
+  return { id: record.id, ...record };
 };
 
 export const updateExpense = async (householdId, expenseId, updates) => {
-  await updateDoc(doc(db, 'households', householdId, 'expenses', expenseId), updates);
+  await pb.collection('expenses').update(expenseId, updates);
 };
 
 export const deleteExpense = async (householdId, expenseId) => {
-  await deleteDoc(doc(db, 'households', householdId, 'expenses', expenseId));
+  await pb.collection('expenses').delete(expenseId);
 };

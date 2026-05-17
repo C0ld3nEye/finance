@@ -1,14 +1,14 @@
-import { collection, addDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
 export const addSettlement = async (householdId, data) => {
-  const ref = await addDoc(collection(db, 'households', householdId, 'settlements'), {
+  const record = await pb.collection('settlements').create({
     ...data,
+    householdId,
     date: new Date().toISOString(),
   });
-  return { id: ref.id, ...data };
+  return { id: record.id, ...record };
 };
 
 export const deleteSettlement = async (householdId, settlementId) => {
-  await deleteDoc(doc(db, 'households', householdId, 'settlements', settlementId));
+  await pb.collection('settlements').delete(settlementId);
 };

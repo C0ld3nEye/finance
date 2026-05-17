@@ -1,33 +1,32 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
-const col = (householdId) => collection(db, 'households', householdId, 'projects');
+const filter = (householdId) => `householdId = "${householdId}"`;
 
 export const getProjects = async (householdId) => {
   if (!householdId) return [];
-  const snap = await getDocs(col(householdId));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return await pb.collection('projects').getFullList({ filter: filter(householdId) });
 };
 
 export const addProject = async (householdId, uid, project) => {
   const data = {
     ...project,
     userId: uid,
+    householdId,
     currentAmount: 0,
     contributions: [],
     status: 'active',
     createdAt: new Date().toISOString(),
   };
-  const ref = await addDoc(col(householdId), data);
-  return { id: ref.id, ...data };
+  const record = await pb.collection('projects').create(data);
+  return { id: record.id, ...record };
 };
 
 export const updateProject = async (householdId, projectId, updates) => {
-  await updateDoc(doc(db, 'households', householdId, 'projects', projectId), updates);
+  await pb.collection('projects').update(projectId, updates);
 };
 
 export const deleteProject = async (householdId, projectId) => {
-  await deleteDoc(doc(db, 'households', householdId, 'projects', projectId));
+  await pb.collection('projects').delete(projectId);
 };
 
 // Ajoute une contribution manuelle à un projet

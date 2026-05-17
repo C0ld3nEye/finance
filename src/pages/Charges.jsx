@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { addCharge, updateCharge, deleteCharge, isChargeVisibleTo } from '../services/charges';
 import { useHouseholdData } from '../hooks/useHouseholdData';
 import { isChargeActiveInMonth, getAccountingMonth, shiftAccountingMonth, formatAccountingMonthLabel } from '../utils/monthUtils';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import {
   Plus, Trash2, PieChart, Users, Lock, Edit2, X,
   ChevronLeft, ChevronRight, Landmark, Eye, Calendar, Info, RefreshCw
@@ -191,7 +191,7 @@ const ChargeForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, c
 };
 
 const Charges = ({ householdId }) => {
-  const uid = auth.currentUser?.uid;
+  const uid = pb.authStore.model?.id;
   const { charges: allCharges, salaries, settings, loading } = useHouseholdData(householdId);
   const { confirm, alert } = useConfirm();
 

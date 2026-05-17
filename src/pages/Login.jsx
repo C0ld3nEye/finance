@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await pb.collection('users').authWithPassword(email, password);
     } catch (err) {
       console.error(err);
       setError('Identifiants invalides ou erreur de connexion.');
@@ -68,7 +67,6 @@ const Login = () => {
             marginBottom: '1.25rem',
             boxShadow: '0 8px 24px rgba(13, 159, 110, 0.3)',
           }}>
-            {/* Icône maison stylisée */}
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
               <polyline points="9 22 9 12 15 12 15 22"/>
@@ -115,6 +113,7 @@ const Login = () => {
             <div>
               <label className="label">Adresse e-mail</label>
               <input
+                id="login-email"
                 type="email"
                 className="input-field"
                 placeholder="vous@exemple.com"
@@ -126,6 +125,7 @@ const Login = () => {
             <div>
               <label className="label">Mot de passe</label>
               <input
+                id="login-password"
                 type="password"
                 className="input-field"
                 placeholder="••••••••"
@@ -135,6 +135,7 @@ const Login = () => {
               />
             </div>
             <button
+              id="login-submit"
               type="submit"
               className="btn btn-primary"
               style={{ width: '100%', marginTop: '0.5rem', height: '2.9rem', fontSize: '0.95rem' }}

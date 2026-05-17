@@ -1,24 +1,22 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
-const col = (householdId) => collection(db, 'households', householdId, 'savings');
+const filter = (householdId) => `householdId = "${householdId}"`;
 
 export const getSavings = async (householdId) => {
   if (!householdId) return [];
-  const snap = await getDocs(col(householdId));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return await pb.collection('savings').getFullList({ filter: filter(householdId) });
 };
 
 export const addSaving = async (householdId, uid, saving) => {
-  const data = { ...saving, userId: uid, createdAt: new Date().toISOString() };
-  const ref = await addDoc(col(householdId), data);
-  return { id: ref.id, ...data };
+  const data = { ...saving, userId: uid, householdId, createdAt: new Date().toISOString() };
+  const record = await pb.collection('savings').create(data);
+  return { id: record.id, ...record };
 };
 
 export const updateSaving = async (householdId, savingId, updates) => {
-  await updateDoc(doc(db, 'households', householdId, 'savings', savingId), updates);
+  await pb.collection('savings').update(savingId, updates);
 };
 
 export const deleteSaving = async (householdId, savingId) => {
-  await deleteDoc(doc(db, 'households', householdId, 'savings', savingId));
+  await pb.collection('savings').delete(savingId);
 };

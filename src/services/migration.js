@@ -1,42 +1,36 @@
-import { db } from '../config/firebase';
-import { collection, getDocs, updateDoc, doc, deleteField } from 'firebase/firestore';
+import { pb } from '../config/pocketbase';
 
 export const migrateMemberId = async (householdId, oldId, newId) => {
   if (!householdId || !oldId || !newId || oldId === newId) return;
+  const f = `householdId = "${householdId}"`;
 
   // 1. Migrer les Charges Fixes
-  const chargesRef = collection(db, 'households', householdId, 'charges');
-  const chargesSnap = await getDocs(chargesRef);
-  for (const cDoc of chargesSnap.docs) {
-    const data = cDoc.data();
-    if (data.distribution && data.distribution[oldId] !== undefined) {
-      const newDist = { ...data.distribution };
-      newDist[newId] = data.distribution[oldId];
+  const charges = await pb.collection('charges').getFullList({ filter: f });
+  for (const charge of charges) {
+    if (charge.distribution && charge.distribution[oldId] !== undefined) {
+      const newDist = { ...charge.distribution };
+      newDist[newId] = charge.distribution[oldId];
       delete newDist[oldId];
-      await updateDoc(cDoc.ref, { distribution: newDist });
+      await pb.collection('charges').update(charge.id, { distribution: newDist });
     }
   }
 
   // 2. Migrer les Dépenses
-  const expensesRef = collection(db, 'households', householdId, 'expenses');
-  const expensesSnap = await getDocs(expensesRef);
-  for (const eDoc of expensesSnap.docs) {
-    const data = eDoc.data();
-    if (data.paidBy === oldId) {
-      await updateDoc(eDoc.ref, { paidBy: newId });
+  const expenses = await pb.collection('expenses').getFullList({ filter: f });
+  for (const expense of expenses) {
+    if (expense.paidBy === oldId) {
+      await pb.collection('expenses').update(expense.id, { paidBy: newId });
     }
   }
 
   // 3. Migrer les Salaires
-  const salariesRef = collection(db, 'households', householdId, 'salaries');
-  const salariesSnap = await getDocs(salariesRef);
-  for (const sDoc of salariesSnap.docs) {
-    const data = sDoc.data();
-    if (data.salaries && data.salaries[oldId] !== undefined) {
-      const newSals = { ...data.salaries };
-      newSals[newId] = data.salaries[oldId];
+  const salaries = await pb.collection('salaries').getFullList({ filter: f });
+  for (const sal of salaries) {
+    if (sal.salaries && sal.salaries[oldId] !== undefined) {
+      const newSals = { ...sal.salaries };
+      newSals[newId] = sal.salaries[oldId];
       delete newSals[oldId];
-      await updateDoc(sDoc.ref, { salaries: newSals });
+      await pb.collection('salaries').update(sal.id, { salaries: newSals });
     }
   }
 };

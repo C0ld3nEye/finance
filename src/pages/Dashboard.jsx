@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import { useHouseholdData } from '../hooks/useHouseholdData';
 import { isChargeVisibleTo } from '../services/charges';
 import { isExpenseVisibleTo } from '../services/expenses';
@@ -24,7 +24,7 @@ const PROJECT_ICONS = {
 const Dashboard = ({ householdId }) => {
   const navigate = useNavigate();
   const [view, setView] = useState('foyer');
-  const uid = auth.currentUser?.uid;
+  const uid = pb.authStore.model?.id;
 
   const { charges, expenses, settlements, savings, projects, salaries, settings, loading } = useHouseholdData(householdId);
 

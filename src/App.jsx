@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './config/firebase';
-import { getUserProfile } from './services/settings';
+import { pb } from './config/pocketbase';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
@@ -18,11 +16,12 @@ import { GlobalSkeleton } from './components/SkeletonLoader';
 import './index.css';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [householdId, setHouseholdId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,        setUser]        = useState(pb.authStore.isValid ? pb.authStore.model : null);
+  const [householdId, setHouseholdId] = useState(pb.authStore.isValid ? (pb.authStore.model?.householdId || null) : null);
+  const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
+    // Thème automatique selon l'heure
     const checkTheme = () => {
       const hour = new Date().getHours();
       if (hour >= 19 || hour < 7) {
@@ -37,16 +36,19 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const profile = await getUserProfile(currentUser.uid);
-        if (profile?.householdId) setHouseholdId(profile.householdId);
-      } else {
-        setHouseholdId(null);
-      }
-      setLoading(false);
+    // Initialisation : vérifier si une session valide existe déjà
+    if (pb.authStore.isValid) {
+      setUser(pb.authStore.model);
+      setHouseholdId(pb.authStore.model?.householdId || null);
+    }
+    setLoading(false);
+
+    // Écouter les changements d'état d'authentification PocketBase
+    const unsubscribe = pb.authStore.onChange((token, model) => {
+      setUser(model);
+      setHouseholdId(model?.householdId || null);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -81,13 +83,13 @@ function App() {
                 <>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard householdId={householdId} />} />
-                  <Route path="/expenses" element={<Expenses householdId={householdId} />} />
-                  <Route path="/charges" element={<Charges householdId={householdId} />} />
-                  <Route path="/salaries" element={<Salaries householdId={householdId} />} />
-                  <Route path="/debts" element={<Debts householdId={householdId} />} />
-                  <Route path="/savings" element={<Savings householdId={householdId} />} />
-                  <Route path="/projects" element={<Projects householdId={householdId} />} />
-                  <Route path="/settings" element={<Settings householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
+                  <Route path="/expenses"  element={<Expenses  householdId={householdId} />} />
+                  <Route path="/charges"   element={<Charges   householdId={householdId} />} />
+                  <Route path="/salaries"  element={<Salaries  householdId={householdId} />} />
+                  <Route path="/debts"     element={<Debts     householdId={householdId} />} />
+                  <Route path="/savings"   element={<Savings   householdId={householdId} />} />
+                  <Route path="/projects"  element={<Projects  householdId={householdId} />} />
+                  <Route path="/settings"  element={<Settings  householdId={householdId} onHouseholdUpdate={setHouseholdId} />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </>
               )}

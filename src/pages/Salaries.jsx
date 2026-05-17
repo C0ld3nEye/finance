@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
 import { getSettings } from '../services/settings';
 import { getMonthlySalaries, updateMonthlySalaries } from '../services/salaries';
-import { auth } from '../config/firebase';
+
 import { formatAccountingMonthLabel } from '../utils/monthUtils';
 import { Wallet, Check, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';

@@ -3,7 +3,7 @@ import { addExpense, updateExpense, deleteExpense, isExpenseVisibleTo } from '..
 import { useHouseholdData } from '../hooks/useHouseholdData';
 import { isInAccountingMonth, getAccountingMonth, shiftAccountingMonth, formatAccountingMonthLabel } from '../utils/monthUtils';
 import { findSalariesForMonth } from '../services/salaries';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import { Plus, Trash2, ChevronLeft, ChevronRight, Edit2, X, Landmark, PieChart, Eye, User, Calendar, Info } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { CATEGORIES, getCategoryConfig } from '../constants/categories';
@@ -152,7 +152,7 @@ const ExpenseForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, 
 };
 
 const Expenses = ({ householdId }) => {
-  const uid = auth.currentUser?.uid;
+  const uid = pb.authStore.model?.id;
   const { expenses: allExpenses, salaries, settings, loading } = useHouseholdData(householdId);
   const { confirm } = useConfirm();
 

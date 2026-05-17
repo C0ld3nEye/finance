@@ -3,7 +3,7 @@ import {
   getProjects, addProject, updateProject, deleteProject,
   addContribution, removeContribution
 } from '../services/projects';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import {
   Plus, X, Trash2, Edit2, ChevronDown, ChevronUp,
   Car, Home, Plane, Wrench, GraduationCap, Baby,
@@ -67,7 +67,7 @@ const Projects = ({ householdId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const uid = auth.currentUser?.uid;
+    const uid = pb.authStore.model?.id;
     const payload = {
       name: form.name.trim(), iconKey: form.iconKey,
       targetAmount: Number(form.targetAmount),

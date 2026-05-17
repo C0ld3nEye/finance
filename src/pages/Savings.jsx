@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSavings, addSaving, updateSaving, deleteSaving } from '../services/savings';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import { Plus, Edit2, Trash2, PiggyBank, Landmark, Wallet, TrendingUp, MoreHorizontal } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
@@ -69,7 +69,7 @@ const Savings = ({ householdId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const uid = auth.currentUser?.uid;
+    const uid = pb.authStore.model?.id;
     const destination = form.destination === 'Autre' && form.customDestination
       ? form.customDestination : form.destination;
     const payload = {

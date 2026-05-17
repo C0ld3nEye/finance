@@ -1,19 +1,25 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 
 export const updateMonthlySalaries = async (householdId, year, month, salaries) => {
-  const id = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-  await setDoc(doc(db, 'households', householdId, 'salaries', id), {
-    salaries, year, month, updatedAt: new Date().toISOString(),
-  });
+  const salaryId = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+  const data = { salaries, year, month, householdId, salaryId, updatedAt: new Date().toISOString() };
+
+  try {
+    const existing = await pb.collection('salaries').getFirstListItem(
+      `householdId = "${householdId}" && salaryId = "${salaryId}"`
+    );
+    await pb.collection('salaries').update(existing.id, data);
+  } catch {
+    await pb.collection('salaries').create(data);
+  }
 };
 
 /**
  * Trouve les salaires d'un mois donné dans le tableau retourné par useHouseholdData.
  */
 export const findSalariesForMonth = (allSalaries, year, month) => {
-  const id = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-  return allSalaries.find(s => s.id === id) || null;
+  const salaryId = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+  return allSalaries.find(s => s.salaryId === salaryId) || null;
 };
 
 /**
@@ -21,7 +27,12 @@ export const findSalariesForMonth = (allSalaries, year, month) => {
  */
 export const getMonthlySalaries = async (householdId, year, month) => {
   if (!householdId) return null;
-  const id = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-  const snap = await getDoc(doc(db, 'households', householdId, 'salaries', id));
-  return snap.exists() ? snap.data() : null;
+  const salaryId = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+  try {
+    return await pb.collection('salaries').getFirstListItem(
+      `householdId = "${householdId}" && salaryId = "${salaryId}"`
+    );
+  } catch {
+    return null;
+  }
 };

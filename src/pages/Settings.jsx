@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings, updateUserProfile } from '../services/settings';
-import { auth } from '../config/firebase';
-import { Save, Plus, Trash2, Home, Users, Lock, Calendar } from 'lucide-react';
+import { pb } from '../config/pocketbase';
+import { Save, Plus, Trash2, Home, Users, Lock, Calendar, Download } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { repairAllCategories } from '../utils/categoryRepair';
 import { SettingsSkeleton } from '../components/SkeletonLoader';
 
 const Settings = ({ householdId, onHouseholdUpdate }) => {
   const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
   const [hIdInput, setHidInput] = useState(householdId || '');
   const { alert, confirm } = useConfirm();
 
@@ -29,7 +29,8 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     if (!hIdInput.trim()) return;
     setSaving(true);
     try {
-      await updateUserProfile(auth.currentUser?.uid, { householdId: hIdInput.trim() });
+      const uid = pb.authStore.model?.id;
+      await updateUserProfile(uid, { householdId: hIdInput.trim() });
       onHouseholdUpdate(hIdInput.trim());
       await alert({ title: 'Foyer mis à jour', message: 'Vous avez rejoint le foyer : ' + hIdInput.trim(), variant: 'success', icon: 'success' });
     } catch (e) {
@@ -59,11 +60,11 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     const isShared = (a[i].visibility || 'shared') === 'shared';
     a[i].visibility = isShared ? 'private' : 'shared';
     if (!isShared) delete a[i].ownerId;
-    else a[i].ownerId = auth.currentUser?.uid;
+    else a[i].ownerId = pb.authStore.model?.id;
     setSettings({ ...settings, accounts: a });
   };
 
-  const uid = auth.currentUser?.uid;
+  const uid = pb.authStore.model?.id;
 
   if (loading) return <SettingsSkeleton />;
 
@@ -200,7 +201,7 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
       )}
 
       {/* Maintenance */}
-      <div className="card" style={{ border: '1px solid var(--warning-light)' }}>
+      <div className="card" style={{ border: '1px solid var(--warning-light)', marginBottom: '1.25rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', color: 'var(--warning)' }}>Outils de maintenance</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
           Si vos graphiques ne s'affichent pas correctement, lancez une réparation automatique des catégories.
@@ -218,7 +219,73 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
           🪄 Réparer les catégories
         </button>
       </div>
+
+      {/* Export Firebase (migration one-shot) */}
+      <div className="card" style={{ border: '1px solid var(--border-solid)' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Download size={18} /> Export données Firebase
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+          Téléchargez toutes vos données Firebase au format JSON pour les importer dans PocketBase.
+        </p>
+        <ExportFirebaseButton householdId={householdId} />
+      </div>
     </div>
+  );
+};
+
+// ─── Composant d'export Firebase ────────────────────────────────────────────
+import {
+  collection, getDocs, doc, getDoc
+} from 'firebase/firestore';
+import { db as firebaseDb } from '../config/firebase';
+
+const ExportFirebaseButton = ({ householdId }) => {
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!householdId) return;
+    setExporting(true);
+    try {
+      const backup = { householdId, exportedAt: new Date().toISOString() };
+
+      // Settings
+      const settingsSnap = await getDoc(doc(firebaseDb, 'households', householdId, 'config', 'settings'));
+      backup.settings = settingsSnap.exists() ? settingsSnap.data() : null;
+
+      // Collections
+      const cols = ['expenses', 'charges', 'settlements', 'savings', 'projects', 'salaries'];
+      for (const colName of cols) {
+        const snap = await getDocs(collection(firebaseDb, 'households', householdId, colName));
+        backup[colName] = snap.docs.map(d => ({ _firebaseId: d.id, ...d.data() }));
+      }
+
+      // Téléchargement
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `backup-firebase-${householdId}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error', err);
+      alert('Erreur lors de l\'export : ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <button
+      className="btn"
+      style={{ border: '1px solid var(--border-solid)', gap: '0.4rem' }}
+      onClick={handleExport}
+      disabled={exporting || !householdId}
+    >
+      <Download size={15} />
+      {exporting ? 'Export en cours…' : 'Télécharger backup.json'}
+    </button>
   );
 };
 

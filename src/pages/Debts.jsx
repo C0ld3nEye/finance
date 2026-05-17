@@ -4,7 +4,7 @@ import { isChargeVisibleTo } from '../services/charges';
 import { isExpenseVisibleTo } from '../services/expenses';
 import { isChargeActiveInMonth, isInAccountingMonth, shiftAccountingMonth, getAccountingMonth, formatAccountingMonthLabel } from '../utils/monthUtils';
 import { useHouseholdData } from '../hooks/useHouseholdData';
-import { auth } from '../config/firebase';
+import { pb } from '../config/pocketbase';
 import {
   ArrowUpDown, Landmark, User, CheckCircle2, Trash2,
   ChevronLeft, ChevronRight, History, ChevronDown, ChevronUp, FileText
@@ -85,7 +85,7 @@ const DetailAccordion = ({ details, mySettlements, currentMonthKey }) => {
 };
 
 const Debts = ({ householdId }) => {
-  const uid = auth.currentUser?.uid;
+  const uid = pb.authStore.model?.id;
   const { charges, expenses, settlements, salaries, settings, loading } = useHouseholdData(householdId);
 
   const startDay = settings?.accountStartDay || 1;

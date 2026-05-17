@@ -1,7 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-
-const col = (householdId) => collection(db, 'households', householdId, 'charges');
+import { pb } from '../config/pocketbase';
 
 /**
  * Filtre client : une charge est visible si elle est partagée ou appartient à l'uid.
@@ -15,14 +12,14 @@ export const isChargeVisibleTo = (charge, uid) => {
 
 export const addCharge = async (householdId, uid, charge) => {
   const data = { ...charge, userId: uid, householdId };
-  const ref = await addDoc(col(householdId), data);
-  return { id: ref.id, ...data };
+  const record = await pb.collection('charges').create(data);
+  return { id: record.id, ...record };
 };
 
 export const updateCharge = async (householdId, chargeId, updates) => {
-  await updateDoc(doc(db, 'households', householdId, 'charges', chargeId), updates);
+  await pb.collection('charges').update(chargeId, updates);
 };
 
 export const deleteCharge = async (householdId, chargeId) => {
-  await deleteDoc(doc(db, 'households', householdId, 'charges', chargeId));
+  await pb.collection('charges').delete(chargeId);
 };

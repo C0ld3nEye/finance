@@ -1,22 +1,47 @@
 import React, { useState } from 'react';
 import { pb } from '../config/pocketbase';
-import { LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle, UserPlus } from 'lucide-react';
 
 const Login = () => {
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [email,         setEmail]         = useState('');
+  const [password,      setPassword]      = useState('');
+  const [passwordConf,  setPasswordConf]  = useState('');
+  const [error,         setError]         = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
-      await pb.collection('users').authWithPassword(email, password);
+      if (isRegistering) {
+        if (password !== passwordConf) {
+          throw new Error("Les mots de passe ne correspondent pas.");
+        }
+        if (password.length < 10) {
+          throw new Error("Le mot de passe doit faire au moins 10 caractères.");
+        }
+        // Création du compte
+        await pb.collection('users').create({
+          email,
+          password,
+          passwordConfirm: passwordConf,
+        });
+        // Connexion automatique après création
+        await pb.collection('users').authWithPassword(email, password);
+      } else {
+        // Connexion standard
+        await pb.collection('users').authWithPassword(email, password);
+      }
     } catch (err) {
       console.error(err);
-      setError('Identifiants invalides ou erreur de connexion.');
+      if (err.message) {
+        setError(err.message.includes('Failed to authenticate') ? 'Identifiants invalides.' : err.message);
+      } else {
+        setError('Une erreur est survenue.');
+      }
     } finally {
       setLoading(false);
     }
@@ -84,7 +109,7 @@ const Login = () => {
             Finance Famille
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: '500' }}>
-            Votre espace de gestion foyer
+            {isRegistering ? 'Créez votre compte foyer' : 'Votre espace de gestion foyer'}
           </p>
         </div>
 
@@ -109,7 +134,7 @@ const Login = () => {
             </div>
           )}
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
             <div>
               <label className="label">Adresse e-mail</label>
               <input
@@ -123,7 +148,7 @@ const Login = () => {
               />
             </div>
             <div>
-              <label className="label">Mot de passe</label>
+              <label className="label">Mot de passe {isRegistering && '(min. 10 car.)'}</label>
               <input
                 id="login-password"
                 type="password"
@@ -132,8 +157,26 @@ const Login = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={isRegistering ? 10 : undefined}
               />
             </div>
+
+            {isRegistering && (
+              <div className="animate-fade-in">
+                <label className="label">Confirmer le mot de passe</label>
+                <input
+                  id="login-password-conf"
+                  type="password"
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                  value={passwordConf}
+                  onChange={(e) => setPasswordConf(e.target.value)}
+                  minLength={10}
+                />
+              </div>
+            )}
+
             <button
               id="login-submit"
               type="submit"
@@ -142,11 +185,21 @@ const Login = () => {
               disabled={loading}
             >
               {loading
-                ? <span style={{ opacity: 0.8 }}>Connexion…</span>
-                : <><LogIn size={17} /> Se connecter</>
+                ? <span style={{ opacity: 0.8 }}>{isRegistering ? 'Création...' : 'Connexion...'}</span>
+                : <>{isRegistering ? <UserPlus size={17} /> : <LogIn size={17} />} {isRegistering ? 'Créer mon compte' : 'Se connecter'}</>
               }
             </button>
           </form>
+
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <button 
+              type="button" 
+              onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' }}
+            >
+              {isRegistering ? 'Déjà un compte ? Se connecter' : "Pas de compte ? S'inscrire"}
+            </button>
+          </div>
         </div>
 
         <p style={{
@@ -156,7 +209,7 @@ const Login = () => {
           color: 'var(--text-muted)',
           fontWeight: '500',
         }}>
-          Application privée · Accès restreint
+          Application privée · Accès sécurisé PocketBase
         </p>
       </div>
     </div>

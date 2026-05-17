@@ -34,7 +34,7 @@ async function apiRequest(path, method = 'GET', body = null, token = null) {
 async function main() {
   // 1. Authentification admin
   console.log('🔐 Connexion admin...');
-  const authRes = await apiRequest('admins/auth-with-password', 'POST', {
+  const authRes = await apiRequest('collections/_superusers/auth-with-password', 'POST', {
     identity: adminEmail,
     password: adminPassword,
   });
@@ -51,6 +51,7 @@ async function main() {
         ...(usersCol.schema || []),
         { name: 'householdId', type: 'text', required: false },
       ],
+      createRule: "", // Autorise la création de compte publique
     }, token);
     console.log('  ✅ Champ householdId ajouté aux utilisateurs');
   } else {
@@ -164,6 +165,11 @@ async function main() {
         name: col.name,
         type: 'base',
         schema: col.schema,
+        listRule: '@request.auth.id != ""',
+        viewRule: '@request.auth.id != ""',
+        createRule: '@request.auth.id != ""',
+        updateRule: '@request.auth.id != ""',
+        deleteRule: '@request.auth.id != ""',
       }, token);
       console.log(`  ✅ ${col.name}`);
     } catch (err) {

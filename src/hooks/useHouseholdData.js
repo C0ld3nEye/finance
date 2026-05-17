@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { pb } from '../config/pocketbase';
+import { getSettings as fetchOrCreateSettings } from '../services/settings';
 
 /**
  * Hook central de données temps réel.
@@ -70,9 +71,10 @@ export const useHouseholdData = (householdId) => {
     // Settings : document unique par foyer
     const listenSettings = async () => {
       try {
-        const record = await pb.collection('settings').getFirstListItem(`householdId = "${householdId}"`);
+        const record = await fetchOrCreateSettings(householdId);
         setSettings(record);
-      } catch {
+      } catch (err) {
+        console.error('Settings init error', err);
         setSettings(null);
       }
       markLoaded();

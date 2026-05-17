@@ -36,12 +36,23 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Initialisation : vérifier si une session valide existe déjà
-    if (pb.authStore.isValid) {
-      setUser(pb.authStore.model);
-      setHouseholdId(pb.authStore.model?.householdId || null);
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      if (pb.authStore.isValid) {
+        try {
+          // Rafraîchir les infos depuis le serveur pour être sûr d'avoir le householdId à jour
+          const res = await pb.collection('users').authRefresh();
+          setUser(res.record || pb.authStore.model);
+          setHouseholdId(res.record?.householdId || pb.authStore.model?.householdId || null);
+        } catch (err) {
+          console.error("Erreur de rafraîchissement auth au démarrage:", err);
+          setUser(pb.authStore.model);
+          setHouseholdId(pb.authStore.model?.householdId || null);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
 
     // Écouter les changements d'état d'authentification PocketBase
     const unsubscribe = pb.authStore.onChange((token, model) => {

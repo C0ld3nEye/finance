@@ -37,10 +37,21 @@ export const getSettings = async (householdId) => {
 };
 
 export const updateSettings = async (householdId, newSettings) => {
+  const data = {
+    householdId,
+    members: newSettings.members || [],
+    accounts: newSettings.accounts || [],
+    accountStartDay: newSettings.accountStartDay || 1,
+  };
+
   try {
+    if (newSettings.id) {
+      await pb.collection('settings').update(newSettings.id, data);
+      return;
+    }
     const existing = await pb.collection('settings').getFirstListItem(`householdId = "${householdId}"`);
-    await pb.collection('settings').update(existing.id, newSettings);
+    await pb.collection('settings').update(existing.id, data);
   } catch {
-    await pb.collection('settings').create({ ...newSettings, householdId });
+    await pb.collection('settings').create(data);
   }
 };

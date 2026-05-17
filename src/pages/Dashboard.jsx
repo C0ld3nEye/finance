@@ -184,7 +184,30 @@ const Dashboard = ({ householdId }) => {
   }, [charges, expenses, settlements, savings, salaries, settings, uid, currentYear, currentMonth, startDay]);
 
   if (loading) return <DashboardSkeleton />;
-  if (!computed) return null;
+  if (!computed) {
+    return (
+      <div className="page-container animate-fade-in" style={{ textAlign: 'center', marginTop: '10vh' }}>
+        <AlertTriangle size={48} style={{ color: 'var(--danger)', margin: '0 auto 1rem' }} />
+        <h2 style={{ fontFamily: 'var(--font-display)', marginBottom: '1rem' }}>Erreur d'initialisation</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+          Le tableau de bord n'a pas pu se charger car les paramètres du foyer n'ont pas été trouvés.
+        </p>
+        <div className="card" style={{ textAlign: 'left', background: 'var(--bg-subtle)' }}>
+          <p><strong>Diagnostic :</strong></p>
+          <pre style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+            {JSON.stringify({ 
+              hasSettings: !!settings, 
+              hasUid: !!uid, 
+              householdId 
+            }, null, 2)}
+          </pre>
+        </div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()} style={{ marginTop: '2rem' }}>
+          Rafraîchir la page
+        </button>
+      </div>
+    );
+  }
 
   const {
     tHouseCharges, tHouseExpenses, tPersoCharges, tPersoExpenses,

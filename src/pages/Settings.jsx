@@ -219,7 +219,9 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
           🪄 Réparer les catégories
         </button>
       </div>
-
-
+    </div>
+  );
+};
 
 export default Settings;
+

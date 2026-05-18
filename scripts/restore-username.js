@@ -79,7 +79,31 @@ async function main() {
     });
   }
 
-  // Ajout de l'index unique de username s'il est manquant
+  // ÉTAPE 1 : Ajouter le champ username SANS l'index unique
+  await apiRequest('collections/users', 'PATCH', {
+    schema: newSchema,
+    fields: newFields,
+    // On garde les index existants pour l'instant (sans l'index username)
+    indexes: usersCol.indexes || [],
+  }, token);
+
+  console.log('✅ Champ username recréé (sans contrainte unique).');
+
+  // ÉTAPE 2 : Récupérer tous les utilisateurs et leur donner un username unique temporaire
+  console.log('🔄 Mise à jour des utilisateurs existants pour garantir l\\'unicité...');
+  const recordsRes = await apiRequest('collections/users/records?perPage=500', 'GET', null, token);
+  for (const record of recordsRes.items) {
+    if (!record.username || record.username.trim() === '') {
+      const tempUsername = `user_${Math.random().toString(36).substring(2, 10)}`;
+      await apiRequest(`collections/users/records/${record.id}`, 'PATCH', {
+        username: tempUsername
+      }, token);
+      console.log(`  - Utilisateur ${record.id} mis à jour avec le pseudo : ${tempUsername}`);
+    }
+  }
+
+  // ÉTAPE 3 : Ajouter l'index UNIQUE maintenant que tous les utilisateurs ont un pseudo différent
+  console.log('🔒 Ajout de la contrainte UNIQUE sur username...');
   const newIndexes = [...(usersCol.indexes || [])];
   const hasUsernameIndex = newIndexes.some(idx => idx.includes('username'));
   if (!hasUsernameIndex) {
@@ -92,7 +116,7 @@ async function main() {
     indexes: newIndexes,
   }, token);
 
-  console.log('🎉 Le champ username et ses index uniques ont été restaurés avec succès !');
+  console.log('🎉 Restauration complète et réussie !');
 }
 
 main().catch(err => {

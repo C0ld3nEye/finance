@@ -90,7 +90,7 @@ async function main() {
   console.log('✅ Champ username recréé (sans contrainte unique).');
 
   // ÉTAPE 2 : Récupérer tous les utilisateurs et leur donner un username unique temporaire
-  console.log('🔄 Mise à jour des utilisateurs existants pour garantir l\\'unicité...');
+  console.log("🔄 Mise à jour des utilisateurs existants pour garantir l'unicité...");
   const recordsRes = await apiRequest('collections/users/records?perPage=500', 'GET', null, token);
   for (const record of recordsRes.items) {
     if (!record.username || record.username.trim() === '') {

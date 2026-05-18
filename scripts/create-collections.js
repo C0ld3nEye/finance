@@ -10,8 +10,12 @@
  *   node scripts/create-collections.js admin@foyer.local monmotdepasse
  */
 
-const fs = require('fs');
-const pathModule = require('path');
+import fs from 'fs';
+import pathModule from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = pathModule.dirname(__filename);
 
 let POCKETBASE_URL = 'http://192.168.1.110:8090';
 

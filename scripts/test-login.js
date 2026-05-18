@@ -14,7 +14,7 @@ async function main() {
     console.error('Code Statut HTTP :', err.status);
     console.error('Réponse brute du serveur :', JSON.stringify(err.response, null, 2));
     if (err.originalError) {
-      console.error('Erreur d\\'origine :', err.originalError);
+      console.error("Erreur d'origine :", err.originalError);
     }
   }
 }

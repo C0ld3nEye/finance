@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, updateSettings, updateUserProfile } from '../services/settings';
 import { pb } from '../config/pocketbase';
-import { Save, Plus, Trash2, Home, Users, Lock, Calendar, Download } from 'lucide-react';
+import { Save, Plus, Trash2, Home, Users, Lock, Calendar, Download, Upload, LogOut } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
-import { repairAllCategories } from '../utils/categoryRepair';
 import { SettingsSkeleton } from '../components/SkeletonLoader';
+import { exportHouseholdData, importHouseholdData } from '../services/backup';
 
 const Settings = ({ householdId, onHouseholdUpdate }) => {
   const [settings, setSettings] = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'auto');
   const [hIdInput, setHidInput] = useState(householdId || '');
   const { alert, confirm } = useConfirm();
 
@@ -47,6 +50,85 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
     } catch (e) {
       await alert({ title: 'Erreur', message: 'Erreur lors de la sauvegarde.', variant: 'danger', icon: 'error' });
     } finally { setSaving(false); }
+  };
+
+  const handleExport = async () => {
+    setBackingUp(true);
+    try {
+      await exportHouseholdData(householdId);
+      await alert({ title: 'Exportation réussie', message: 'Votre sauvegarde JSON a été téléchargée.', variant: 'success', icon: 'success' });
+    } catch (e) {
+      await alert({ title: 'Erreur', message: "Impossible d'exporter vos données.", variant: 'danger', icon: 'error' });
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    const ok = await confirm({
+      title: 'Importer la sauvegarde ?',
+      message: 'ATTENTION : Cette action est irréversible et va ÉCRASER l\'intégralité des dépenses, charges, épargnes et projets actuels de ce foyer par le contenu du fichier de sauvegarde.',
+      variant: 'danger',
+      confirmText: 'Écraser et Importer',
+      cancelText: 'Annuler',
+    });
+
+    if (!ok) return;
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      await importHouseholdData(householdId, backup);
+      await alert({ title: 'Restauration réussie', message: 'Toutes les données de votre foyer ont été restaurées avec succès.', variant: 'success', icon: 'success' });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      await alert({
+        title: 'Échec de l\'importation',
+        message: e.message || 'Le fichier de sauvegarde est corrompu ou invalide.',
+        variant: 'danger',
+        icon: 'error',
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+    } else if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark-theme');
+    } else {
+      const hour = new Date().getHours();
+      if (hour >= 19 || hour < 7) {
+        document.documentElement.classList.add('dark-theme');
+      } else {
+        document.documentElement.classList.remove('dark-theme');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Se déconnecter ?',
+      message: 'Êtes-vous sûr de vouloir fermer votre session active ?',
+      variant: 'warning',
+      confirmText: 'Déconnexion',
+      cancelText: 'Annuler',
+    });
+    if (ok) {
+      pb.authStore.clear();
+    }
   };
 
   const handleMemberChange = (i, field, value) => {
@@ -200,25 +282,64 @@ const Settings = ({ householdId, onHouseholdUpdate }) => {
         </div>
       )}
 
-      {/* Maintenance */}
-      <div className="card" style={{ border: '1px solid var(--warning-light)', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', color: 'var(--warning)' }}>Outils de maintenance</h2>
+      {/* Préférences d'affichage */}
+      <section className="card" style={{ marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Users size={18} /> Préférences d'affichage
+        </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-          Si vos graphiques ne s'affichent pas correctement, lancez une réparation automatique des catégories.
+          Sélectionnez le mode d'affichage visuel de votre choix pour l'application.
         </p>
-        <button className="btn" style={{ border: '1px solid var(--warning)', color: 'var(--warning)' }}
-          onClick={async () => {
-            try {
-              const count = await repairAllCategories(householdId);
-              await alert({ title: 'Réparation terminée', message: `${count} éléments catégorisés.`, variant: 'success', icon: 'settings' });
-              window.location.reload();
-            } catch (err) {
-              await alert({ title: 'Erreur', message: 'Une erreur est survenue.', variant: 'danger', icon: 'error' });
-            }
-          }}>
-          🪄 Réparer les catégories
+        <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-subtle)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+          {['light', 'dark', 'auto'].map(t => (
+            <button key={t} type="button" onClick={() => handleThemeChange(t)}
+              style={{
+                flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: 'none',
+                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s',
+                background: theme === t ? 'var(--primary-gradient)' : 'transparent',
+                color: theme === t ? 'white' : 'var(--text-secondary)',
+                boxShadow: theme === t ? 'var(--shadow-sm)' : 'none',
+              }}>
+              {t === 'light' ? '☀️ Clair' : t === 'dark' ? '🌙 Sombre' : '🖥️ Automatique'}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Sauvegarde & Restauration */}
+      <section className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Download size={18} style={{ color: 'var(--accent)' }} /> Sauvegarde des données
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+          Exportez toutes vos données de foyer sous forme de fichier JSON ou restaurez une sauvegarde précédente.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button type="button" className="btn" style={{ background: 'var(--accent-light)', color: 'var(--accent)', flex: 1, minWidth: '150px' }}
+            onClick={handleExport} disabled={backingUp}>
+            <Download size={16} /> {backingUp ? 'Exportation...' : 'Exporter (.json)'}
+          </button>
+          
+          <label className="btn" style={{ border: '1px solid var(--accent)', color: 'var(--accent)', cursor: 'pointer', flex: 1, minWidth: '150px', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem' }}>
+            <Upload size={16} /> {importing ? 'Importation...' : 'Importer (.json)'}
+            <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} disabled={importing} />
+          </label>
+        </div>
+      </section>
+
+      {/* Déconnexion / Session */}
+      <section className="card" style={{ border: '1px solid var(--danger-light)', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <LogOut size={18} /> Session utilisateur
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+          Fermez votre session active en cours sur cet appareil.
+        </p>
+        <button type="button" className="btn" style={{ background: 'var(--danger-light)', color: 'var(--danger)', width: '100%', gap: '0.5rem' }}
+          onClick={handleLogout}>
+          <LogOut size={16} /> Se déconnecter de l'application
         </button>
-      </div>
+      </section>
     </div>
   );
 };

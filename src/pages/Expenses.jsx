@@ -9,6 +9,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { CATEGORIES, getCategoryConfig } from '../constants/categories';
 import { calculateDistribution as calcDist, formatEuro, formatDistributionLabel } from '../utils/finance';
 import { ListPageSkeleton } from '../components/SkeletonLoader';
+import { guessCategory } from '../utils/categoryRepair';
 
 
 
@@ -89,7 +90,17 @@ const ExpenseForm = ({ data, setData, onSubmit, onCancel, title, settings, uid, 
           <div style={{ gridColumn: '1 / -1' }}>
             <label className="label">Description</label>
             <input className="input-field" required placeholder="ex : Courses Leclerc" value={data.description}
-              onChange={e => setData(p => ({ ...p, description: e.target.value }))} />
+              onChange={e => {
+                const val = e.target.value;
+                setData(p => {
+                  const next = { ...p, description: val };
+                  const guessed = guessCategory(val);
+                  if (guessed) {
+                    next.category = guessed;
+                  }
+                  return next;
+                });
+              }} />
           </div>
           <div>
             <label className="label">Montant (€)</label>

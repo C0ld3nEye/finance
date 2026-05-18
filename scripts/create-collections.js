@@ -41,26 +41,26 @@ async function main() {
   const token = authRes.token;
   console.log('✅ Connecté');
 
-  // 2. Ajout du champ householdId sur la collection users (built-in)
-  console.log('\n📦 Extension de la collection users...');
+  // 2. Ajout du champ householdId et sécurisation de la collection users (built-in)
+  console.log('\n📦 Extension et sécurisation de la collection users...');
   const usersCol = await apiRequest('collections/users', 'GET', null, token);
   const hasHouseholdId = usersCol.schema?.some(f => f.name === 'householdId') || usersCol.fields?.some(f => f.name === 'householdId');
+  
+  const updatedFields = [...(usersCol.fields || [])];
   if (!hasHouseholdId) {
-    await apiRequest('collections/users', 'PATCH', {
-      schema: [
-        ...(usersCol.schema || []),
-        { name: 'householdId', type: 'text', required: false },
-      ],
-      fields: [
-        ...(usersCol.fields || []),
-        { name: 'householdId', type: 'text', required: false },
-      ],
-      createRule: "", // Autorise la création de compte publique
-    }, token);
-    console.log('  ✅ Champ householdId ajouté aux utilisateurs');
-  } else {
-    console.log('  ⏭️  householdId déjà présent');
+    updatedFields.push({ name: 'householdId', type: 'text', required: false });
   }
+
+  await apiRequest('collections/users', 'PATCH', {
+    schema: hasHouseholdId ? usersCol.schema : [...(usersCol.schema || []), { name: 'householdId', type: 'text', required: false }],
+    fields: updatedFields,
+    listRule: '@request.auth.id != "" && (id = @request.auth.id || (householdId != "" && householdId = @request.auth.householdId))',
+    viewRule: '@request.auth.id != "" && (id = @request.auth.id || (householdId != "" && householdId = @request.auth.householdId))',
+    createRule: '', // Autorise la création de compte publique
+    updateRule: 'id = @request.auth.id', // Ne peut modifier que lui-même
+    deleteRule: 'id = @request.auth.id',
+  }, token);
+  console.log('  ✅ Collection users mise à jour et sécurisée');
 
   // 3. Définition des collections à créer
   const collections = [
@@ -185,6 +185,14 @@ async function main() {
   console.log('\n📦 Création et alignement des collections...');
   for (const col of collections) {
     try {
+      // Calcul des règles d'API selon la collection pour une isolation stricte des foyers
+      const isHouseholdCol = col.name === 'households';
+      const listRule   = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && householdId = @request.auth.householdId';
+      const viewRule   = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && householdId = @request.auth.householdId';
+      const createRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && householdId = @request.auth.householdId && @request.data.householdId = @request.auth.householdId';
+      const updateRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && householdId = @request.auth.householdId && @request.data.householdId = @request.auth.householdId';
+      const deleteRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && householdId = @request.auth.householdId';
+
       // 1. Tenter d'obtenir la collection existante
       let existingCol = null;
       try {
@@ -195,7 +203,7 @@ async function main() {
 
       if (existingCol) {
         // La collection existe déjà, on la met à jour pour s'assurer que ses champs sont présents
-        console.log(`  ⚙️  Mise à jour de la collection "${col.name}"...`);
+        console.log(`  ⚙️  Mise à jour et sécurisation de la collection "${col.name}"...`);
         
         // Sous PocketBase v0.22+, il faut préserver les champs systèmes existants (comme id, created, updated) dans l'array fields
         const existingFields = existingCol.fields || [];
@@ -211,13 +219,13 @@ async function main() {
         await apiRequest(`collections/${col.name}`, 'PATCH', {
           schema: col.schema,
           fields: newFields,
-          listRule: '@request.auth.id != ""',
-          viewRule: '@request.auth.id != ""',
-          createRule: '@request.auth.id != ""',
-          updateRule: '@request.auth.id != ""',
-          deleteRule: '@request.auth.id != ""',
+          listRule,
+          viewRule,
+          createRule,
+          updateRule,
+          deleteRule,
         }, token);
-        console.log(`  ✅ Collection "${col.name}" alignée avec succès`);
+        console.log(`  ✅ Collection "${col.name}" alignée et sécurisée avec succès`);
       } else {
         // Créer la collection
         console.log(`  ➕ Création de la collection "${col.name}"...`);
@@ -226,13 +234,13 @@ async function main() {
           type: 'base',
           schema: col.schema,
           fields: col.schema,
-          listRule: '@request.auth.id != ""',
-          viewRule: '@request.auth.id != ""',
-          createRule: '@request.auth.id != ""',
-          updateRule: '@request.auth.id != ""',
-          deleteRule: '@request.auth.id != ""',
+          listRule,
+          viewRule,
+          createRule,
+          updateRule,
+          deleteRule,
         }, token);
-        console.log(`  ✅ Collection "${col.name}" créée avec succès`);
+        console.log(`  ✅ Collection "${col.name}" créée et sécurisée avec succès`);
       }
     } catch (err) {
       console.error(`  ❌ Erreur sur la collection "${col.name}" : ${err.message}`);

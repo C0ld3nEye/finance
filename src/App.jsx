@@ -21,17 +21,25 @@ function App() {
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
-    // Thème automatique selon l'heure
+    // Thème persistant (choix manuel) ou automatique selon l'heure
     const checkTheme = () => {
-      const hour = new Date().getHours();
-      if (hour >= 19 || hour < 7) {
+      const savedTheme = localStorage.getItem('theme') || 'auto';
+      if (savedTheme === 'dark') {
         document.documentElement.classList.add('dark-theme');
-      } else {
+      } else if (savedTheme === 'light') {
         document.documentElement.classList.remove('dark-theme');
+      } else {
+        // Mode automatique par défaut (basé sur l'heure)
+        const hour = new Date().getHours();
+        if (hour >= 19 || hour < 7) {
+          document.documentElement.classList.add('dark-theme');
+        } else {
+          document.documentElement.classList.remove('dark-theme');
+        }
       }
     };
     checkTheme();
-    const interval = setInterval(checkTheme, 60000);
+    const interval = setInterval(checkTheme, 15000);
     return () => clearInterval(interval);
   }, []);
 

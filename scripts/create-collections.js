@@ -217,8 +217,8 @@ async function main() {
       const isHouseholdCol = col.name === 'households';
       const listRule   = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId';
       const viewRule   = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId';
-      const createRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && @request.data.householdId = @request.auth.householdId';
-      const updateRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId && @request.data.householdId = @request.auth.householdId';
+      const createRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId';
+      const updateRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId';
       const deleteRule = isHouseholdCol ? '@request.auth.id != ""' : '@request.auth.id != "" && @request.auth.householdId != "" && householdId = @request.auth.householdId';
 
       // 1. Tenter d'obtenir la collection existante

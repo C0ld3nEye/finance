@@ -10,13 +10,37 @@
  *   node scripts/create-collections.js admin@foyer.local monmotdepasse
  */
 
-const POCKETBASE_URL = 'http://192.168.1.110:8090';
+const fs = require('fs');
+const pathModule = require('path');
 
-const [,, adminEmail, adminPassword] = process.argv;
+let POCKETBASE_URL = 'http://192.168.1.110:8090';
+
+// Lecture du fichier .env
+try {
+  const envPath = pathModule.join(__dirname, '../.env');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const match = envContent.match(/VITE_POCKETBASE_URL\s*=\s*(.+)/);
+    if (match && match[1]) {
+      POCKETBASE_URL = match[1].trim();
+    }
+  }
+} catch (e) {
+  // Ignorer
+}
+
+const [,, adminEmail, adminPassword, customUrl] = process.argv;
 if (!adminEmail || !adminPassword) {
-  console.error('Usage: node create-collections.js <email> <password>');
+  console.error('Usage: node create-collections.js <email> <password> [pocketbase-url]');
+  console.error('Exemple : node scripts/create-collections.js admin@example.com mon_passe http://127.0.0.1:8090');
   process.exit(1);
 }
+
+if (customUrl) {
+  POCKETBASE_URL = customUrl.trim();
+}
+
+console.log(`📡 URL PocketBase ciblée : ${POCKETBASE_URL}`);
 
 async function apiRequest(path, method = 'GET', body = null, token = null) {
   const headers = { 'Content-Type': 'application/json' };

@@ -14,7 +14,7 @@ async function main() {
     console.log('✅ Inscription réussie !');
     console.log('Nouvel utilisateur créé :', JSON.stringify(record, null, 2));
   } catch (err) {
-    console.error('❌ Erreur d\\'inscription détectée :');
+    console.error("❌ Erreur d'inscription détectée :");
     console.error('Message :', err.message);
     console.error('Code Statut HTTP :', err.status);
     console.error('Réponse brute du serveur :', JSON.stringify(err.response, null, 2));

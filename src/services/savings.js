@@ -13,8 +13,19 @@ export const addSaving = async (householdId, uid, saving) => {
   return { id: record.id, ...record };
 };
 
+const cleanPayload = (payload) => {
+  const clean = { ...payload };
+  delete clean.id;
+  delete clean.collectionId;
+  delete clean.collectionName;
+  delete clean.created;
+  delete clean.updated;
+  delete clean.expand;
+  return clean;
+};
+
 export const updateSaving = async (householdId, savingId, updates) => {
-  await pb.collection('savings').update(savingId, updates);
+  await pb.collection('savings').update(savingId, cleanPayload(updates));
 };
 
 export const deleteSaving = async (householdId, savingId) => {

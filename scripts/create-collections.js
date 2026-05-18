@@ -72,7 +72,7 @@ async function main() {
   // 2. Ajout du champ householdId et sécurisation de la collection users (built-in)
   console.log('\n📦 Extension et sécurisation de la collection users...');
   const usersCol = await apiRequest('collections/users', 'GET', null, token);
-  const hasHouseholdId = usersCol.schema?.some(f => f.name === 'householdId') || usersCol.fields?.some(f => f.name === 'householdId');
+  const hasHouseholdId = usersCol.fields?.some(f => f.name === 'householdId');
   
   const updatedFields = [...(usersCol.fields || [])];
   if (!hasHouseholdId) {
@@ -80,7 +80,6 @@ async function main() {
   }
 
   await apiRequest('collections/users', 'PATCH', {
-    schema: hasHouseholdId ? usersCol.schema : [...(usersCol.schema || []), { name: 'householdId', type: 'text', required: false }],
     fields: updatedFields,
     listRule: '@request.auth.id != "" && (id = @request.auth.id || (@request.auth.householdId != "" && householdId = @request.auth.householdId))',
     viewRule: '@request.auth.id != "" && (id = @request.auth.id || (@request.auth.householdId != "" && householdId = @request.auth.householdId))',

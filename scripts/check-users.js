@@ -1,4 +1,4 @@
-import { pb } from '../src/config/pocketbase.js';
+
 
 // Since we cannot run directly, let's write a node script that will be executed on the VM to inspect the 'users' collection structure.
 import pathModule from 'path';

@@ -84,7 +84,7 @@ async function main() {
       schema: [
         { name: 'householdId',  type: 'text',   required: true },
         { name: 'userId',       type: 'text',   required: false },
-        { name: 'label',        type: 'text',   required: false },
+        { name: 'description',  type: 'text',   required: false },
         { name: 'amount',       type: 'number', required: false },
         { name: 'date',         type: 'text',   required: false },
         { name: 'category',     type: 'text',   required: false },
@@ -99,7 +99,7 @@ async function main() {
       schema: [
         { name: 'householdId',  type: 'text',   required: true },
         { name: 'userId',       type: 'text',   required: false },
-        { name: 'label',        type: 'text',   required: false },
+        { name: 'name',         type: 'text',   required: false },
         { name: 'amount',       type: 'number', required: false },
         { name: 'frequency',    type: 'text',   required: false },
         { name: 'visibility',   type: 'text',   required: false },
@@ -125,7 +125,7 @@ async function main() {
       schema: [
         { name: 'householdId',  type: 'text',   required: true },
         { name: 'userId',       type: 'text',   required: false },
-        { name: 'label',        type: 'text',   required: false },
+        { name: 'name',         type: 'text',   required: false },
         { name: 'amount',       type: 'number', required: false },
         { name: 'targetAmount', type: 'number', required: false },
         { name: 'category',     type: 'text',   required: false },
@@ -138,7 +138,7 @@ async function main() {
       schema: [
         { name: 'householdId',   type: 'text',   required: true },
         { name: 'userId',        type: 'text',   required: false },
-        { name: 'label',         type: 'text',   required: false },
+        { name: 'name',          type: 'text',   required: false },
         { name: 'targetAmount',  type: 'number', required: false },
         { name: 'currentAmount', type: 'number', required: false },
         { name: 'contributions', type: 'json',   required: false },

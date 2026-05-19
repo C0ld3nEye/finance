@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = pathModule.dirname(__filename);
 
-let POCKETBASE_URL = 'http://192.168.1.110:8090';
+let POCKETBASE_URL = 'http://127.0.0.1:8090';
 
 // Lecture du fichier .env
 try {

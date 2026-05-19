@@ -15,9 +15,24 @@
  *   node scripts/import-to-pocketbase.js admin@foyer.local motdepasse ./backup.json
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const POCKETBASE_URL = 'http://192.168.1.110:8090';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+let POCKETBASE_URL = 'http://127.0.0.1:8090';
+
+// Lecture du fichier .env
+try {
+  const envPath = join(__dirname, '../.env');
+  if (existsSync(envPath)) {
+    const envContent = readFileSync(envPath, 'utf8');
+    const match = envContent.match(/VITE_POCKETBASE_URL\s*=\s*(.+)/);
+    if (match && match[1]) POCKETBASE_URL = match[1].trim();
+  }
+} catch (_) {}
 const [,, adminEmail, adminPassword, backupPath] = process.argv;
 
 if (!adminEmail || !adminPassword || !backupPath) {
@@ -66,7 +81,7 @@ async function main() {
 
   // 2. Auth admin PocketBase
   console.log('\n🔐 Connexion admin PocketBase...');
-  const authRes = await apiRequest('admins/auth-with-password', 'POST', {
+  const authRes = await apiRequest('collections/_superusers/auth-with-password', 'POST', {
     identity: adminEmail,
     password: adminPassword,
   });
@@ -86,7 +101,7 @@ async function main() {
 
   // 4. Import settings
   console.log('\n⚙️  Import des paramètres...');
-  if (backup.settings) {
+  if (backup.data?.settings) {
     try {
       // Vérifier si settings existe déjà
       const existing = await apiRequest(
@@ -95,12 +110,12 @@ async function main() {
       );
       if (existing.items?.length > 0) {
         await apiRequest(`collections/settings/records/${existing.items[0].id}`, 'PATCH', {
-          ...backup.settings, householdId: backup.householdId
+          ...backup.data.settings, householdId: backup.householdId
         }, token);
         console.log('  ✅ Paramètres mis à jour');
       } else {
         await apiRequest('collections/settings/records', 'POST', {
-          ...backup.settings, householdId: backup.householdId
+          ...backup.data.settings, householdId: backup.householdId
         }, token);
         console.log('  ✅ Paramètres créés');
       }
@@ -113,7 +128,7 @@ async function main() {
   console.log('\n📦 Import des données...');
   const collections = ['expenses', 'charges', 'settlements', 'savings', 'projects', 'salaries'];
   for (const col of collections) {
-    await importCollection(token, col, backup[col]);
+    await importCollection(token, col, backup.data[col]);
   }
 
   console.log('\n🎉 Import terminé !');

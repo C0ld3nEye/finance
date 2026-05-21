@@ -30,7 +30,12 @@ try {
   if (existsSync(envPath)) {
     const envContent = readFileSync(envPath, 'utf8');
     const match = envContent.match(/VITE_POCKETBASE_URL\s*=\s*(.+)/);
-    if (match && match[1]) POCKETBASE_URL = match[1].trim();
+    if (match && match[1]) {
+      const url = match[1].trim();
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        POCKETBASE_URL = url;
+      }
+    }
   }
 } catch (_) {}
 const [,, adminEmail, adminPassword, backupPath] = process.argv;
